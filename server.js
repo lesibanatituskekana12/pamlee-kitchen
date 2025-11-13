@@ -7,7 +7,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
@@ -62,12 +62,23 @@ function initDatabase() {
       total REAL NOT NULL,
       payment_method TEXT NOT NULL,
       fulfilment TEXT NOT NULL,
+      delivery_location TEXT,
+      delivery_address TEXT,
       status TEXT DEFAULT 'placed',
       timeline TEXT,
       placed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  
+  // Add new columns if they don't exist (for existing databases)
+  try {
+    db.exec(`ALTER TABLE orders ADD COLUMN delivery_location TEXT`);
+  } catch (e) { /* Column already exists */ }
+  
+  try {
+    db.exec(`ALTER TABLE orders ADD COLUMN delivery_address TEXT`);
+  } catch (e) { /* Column already exists */ }
 
   // Seed initial products if empty
   const productCount = db.prepare('SELECT COUNT(*) as count FROM products').get();
@@ -318,7 +329,7 @@ app.delete('/api/products/:id', authenticateToken, requireAdmin, (req, res) => {
 // ============================
 app.post('/api/orders', (req, res) => {
   try {
-    const { trackerId, userEmail, items, subtotal, deliveryFee, total, paymentMethod, fulfilment } = req.body;
+    const { trackerId, userEmail, items, subtotal, deliveryFee, total, paymentMethod, fulfilment, deliveryLocation, deliveryAddress } = req.body;
 
     if (!trackerId || !userEmail || !items || !total) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -326,12 +337,13 @@ app.post('/api/orders', (req, res) => {
 
     const timeline = JSON.stringify([{
       date: new Date().toLocaleString(),
+      status: 'placed',
       message: 'Order placed successfully.'
     }]);
 
     db.prepare(`
-      INSERT INTO orders (tracker_id, user_email, items, subtotal, delivery_fee, total, payment_method, fulfilment, timeline)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO orders (tracker_id, user_email, items, subtotal, delivery_fee, total, payment_method, fulfilment, delivery_location, delivery_address, timeline)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       trackerId,
       userEmail,
@@ -341,6 +353,8 @@ app.post('/api/orders', (req, res) => {
       total,
       paymentMethod,
       fulfilment,
+      deliveryLocation || 'N/A',
+      deliveryAddress || 'N/A',
       timeline
     );
 
@@ -372,6 +386,8 @@ app.get('/api/orders', authenticateToken, (req, res) => {
         total: o.total,
         paymentMethod: o.payment_method,
         fulfilment: o.fulfilment,
+        deliveryLocation: o.delivery_location,
+        deliveryAddress: o.delivery_address,
         status: o.status,
         timeline: JSON.parse(o.timeline || '[]'),
         placedAt: o.placed_at,
@@ -426,6 +442,7 @@ app.put('/api/orders/:trackerId', authenticateToken, requireAdmin, (req, res) =>
     const timeline = JSON.parse(order.timeline || '[]');
     timeline.push({
       date: new Date().toLocaleString(),
+      status: status,
       message: note || `Order status updated to "${status}"`
     });
 

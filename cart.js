@@ -154,7 +154,15 @@ function createOrder(order) {
     orderChannel.post({ type: 'new_order', order });
 }
 
-// Checkout function (shows modal)
+// Location-based delivery fees
+const DELIVERY_ZONES = {
+    'giyani-central': { name: 'Giyani Central', fee: 30 },
+    'giyani-suburbs': { name: 'Giyani Suburbs', fee: 50 },
+    'nearby-towns': { name: 'Nearby Towns (10-20km)', fee: 80 },
+    'far-areas': { name: 'Far Areas (20km+)', fee: 120 }
+};
+
+// Checkout function (shows enhanced modal)
 function checkout() {
     const cart = getCart();
     if (cart.length === 0) {
@@ -162,51 +170,243 @@ function checkout() {
         return;
     }
 
-    // Build checkout modal
+    const subtotal = getCartTotal();
+
+    // Build enhanced checkout modal
     const modal = document.createElement('div');
+    modal.id = 'checkoutModal';
     modal.innerHTML = `
-        <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:#0008;display:flex;justify-content:center;align-items:center;z-index:9999;">
-          <div style="background:#fff;padding:2rem;border-radius:1rem;max-width:400px;width:90%;">
-            <h3>Complete Your Order</h3>
-            <p>Select your payment and delivery options:</p>
+        <div class="checkout-overlay">
+          <div class="checkout-modal">
+            <div class="checkout-header">
+              <h2>Complete Your Order</h2>
+              <button class="btn-close-checkout" onclick="this.closest('.checkout-overlay').remove()">&times;</button>
+            </div>
+            
+            <div class="checkout-body">
+              <!-- Order Summary -->
+              <div class="checkout-section">
+                <h3>📦 Order Summary</h3>
+                <div class="order-summary">
+                  ${cart.map(item => `
+                    <div class="summary-item">
+                      <span>${item.name} x${item.quantity}</span>
+                      <span>R ${(item.price * item.quantity).toFixed(2)}</span>
+                    </div>
+                  `).join('')}
+                  <div class="summary-divider"></div>
+                  <div class="summary-item summary-subtotal">
+                    <span>Subtotal</span>
+                    <span>R ${subtotal.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
 
-            <label>Payment Method:</label>
-            <select id="payMethod" style="width:100%;padding:0.5rem;margin-bottom:1rem;">
-              <option value="cash">Cash</option>
-              <option value="card">Card</option>
-              <option value="eft">EFT</option>
-            </select>
+              <!-- Payment Method -->
+              <div class="checkout-section">
+                <h3>💳 Payment Method</h3>
+                <div class="payment-options">
+                  <label class="payment-option">
+                    <input type="radio" name="payment" value="cash" checked>
+                    <div class="payment-card">
+                      <div class="payment-icon">💵</div>
+                      <div class="payment-info">
+                        <strong>Cash</strong>
+                        <small>Pay on delivery/pickup</small>
+                      </div>
+                    </div>
+                  </label>
+                  <label class="payment-option">
+                    <input type="radio" name="payment" value="card">
+                    <div class="payment-card">
+                      <div class="payment-icon">💳</div>
+                      <div class="payment-info">
+                        <strong>Card</strong>
+                        <small>Debit or Credit Card</small>
+                      </div>
+                    </div>
+                  </label>
+                  <label class="payment-option">
+                    <input type="radio" name="payment" value="eft">
+                    <div class="payment-card">
+                      <div class="payment-icon">🏦</div>
+                      <div class="payment-info">
+                        <strong>EFT</strong>
+                        <small>Bank Transfer</small>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
 
-            <label>Order Type:</label>
-            <select id="fulfil" style="width:100%;padding:0.5rem;margin-bottom:1rem;">
-              <option value="pickup">Pickup</option>
-              <option value="delivery">Delivery (+R40)</option>
-            </select>
+              <!-- Fulfillment Method -->
+              <div class="checkout-section">
+                <h3>🚚 Fulfillment Method</h3>
+                <div class="fulfillment-options">
+                  <label class="fulfillment-option">
+                    <input type="radio" name="fulfillment" value="pickup" checked onchange="updateCheckoutTotal()">
+                    <div class="fulfillment-card">
+                      <div class="fulfillment-icon">🏪</div>
+                      <div class="fulfillment-info">
+                        <strong>Pickup</strong>
+                        <small>Collect from our store</small>
+                        <span class="fulfillment-fee">FREE</span>
+                      </div>
+                    </div>
+                  </label>
+                  <label class="fulfillment-option">
+                    <input type="radio" name="fulfillment" value="delivery" onchange="updateCheckoutTotal()">
+                    <div class="fulfillment-card">
+                      <div class="fulfillment-icon">🚗</div>
+                      <div class="fulfillment-info">
+                        <strong>Delivery</strong>
+                        <small>We deliver to you</small>
+                        <span class="fulfillment-fee" id="deliveryFeeLabel">Select location</span>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
 
-            <div style="text-align:right;">
-              <button id="cancelCheckout" class="btn btn-outline" style="margin-right:0.5rem;">Cancel</button>
-              <button id="confirmCheckout" class="btn btn-gold">Confirm</button>
+              <!-- Delivery Location (shown when delivery is selected) -->
+              <div class="checkout-section" id="deliveryLocationSection" style="display:none;">
+                <h3>📍 Delivery Location</h3>
+                <select id="deliveryZone" class="delivery-zone-select" onchange="updateCheckoutTotal()">
+                  <option value="">Select your location</option>
+                  ${Object.entries(DELIVERY_ZONES).map(([key, zone]) => `
+                    <option value="${key}">${zone.name} - R ${zone.fee}</option>
+                  `).join('')}
+                </select>
+                <input type="text" id="deliveryAddress" class="delivery-address-input" placeholder="Enter your full delivery address" style="margin-top:0.75rem;">
+              </div>
+
+              <!-- Total -->
+              <div class="checkout-total">
+                <div class="total-row">
+                  <span>Subtotal</span>
+                  <span>R ${subtotal.toFixed(2)}</span>
+                </div>
+                <div class="total-row" id="deliveryFeeRow" style="display:none;">
+                  <span>Delivery Fee</span>
+                  <span id="deliveryFeeAmount">R 0.00</span>
+                </div>
+                <div class="total-divider"></div>
+                <div class="total-row total-final">
+                  <span>Total</span>
+                  <span id="finalTotal">R ${subtotal.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="checkout-footer">
+              <button class="btn btn-outline" onclick="this.closest('.checkout-overlay').remove()">Cancel</button>
+              <button class="btn btn-gold" onclick="confirmCheckout()">Place Order</button>
             </div>
           </div>
         </div>
     `;
     document.body.appendChild(modal);
 
-    // Handle actions
-    modal.querySelector('#cancelCheckout').onclick = () => modal.remove();
-    modal.querySelector('#confirmCheckout').onclick = () => {
-        const payMethod = modal.querySelector('#payMethod').value;
-        const fulfil = modal.querySelector('#fulfil').value;
-        modal.remove();
-        processCheckout(payMethod, fulfil);
-    };
+    // Add event listeners for fulfillment change
+    const fulfillmentRadios = modal.querySelectorAll('input[name="fulfillment"]');
+    fulfillmentRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const deliverySection = document.getElementById('deliveryLocationSection');
+            const deliveryFeeLabel = document.getElementById('deliveryFeeLabel');
+            if (e.target.value === 'delivery') {
+                deliverySection.style.display = 'block';
+                deliveryFeeLabel.textContent = 'Select location';
+            } else {
+                deliverySection.style.display = 'none';
+                deliveryFeeLabel.textContent = 'FREE';
+            }
+        });
+    });
+}
+
+// Update checkout total based on selections
+function updateCheckoutTotal() {
+    const subtotal = getCartTotal();
+    const fulfillment = document.querySelector('input[name="fulfillment"]:checked')?.value;
+    const deliveryZone = document.getElementById('deliveryZone')?.value;
+    
+    let deliveryFee = 0;
+    if (fulfillment === 'delivery' && deliveryZone && DELIVERY_ZONES[deliveryZone]) {
+        deliveryFee = DELIVERY_ZONES[deliveryZone].fee;
+    }
+    
+    const total = subtotal + deliveryFee;
+    
+    // Update UI
+    const deliveryFeeRow = document.getElementById('deliveryFeeRow');
+    const deliveryFeeAmount = document.getElementById('deliveryFeeAmount');
+    const finalTotal = document.getElementById('finalTotal');
+    const deliveryFeeLabel = document.getElementById('deliveryFeeLabel');
+    
+    if (fulfillment === 'delivery' && deliveryZone) {
+        deliveryFeeRow.style.display = 'flex';
+        deliveryFeeAmount.textContent = `R ${deliveryFee.toFixed(2)}`;
+        deliveryFeeLabel.textContent = `R ${deliveryFee}`;
+    } else if (fulfillment === 'delivery') {
+        deliveryFeeRow.style.display = 'none';
+        deliveryFeeLabel.textContent = 'Select location';
+    } else {
+        deliveryFeeRow.style.display = 'none';
+        deliveryFeeLabel.textContent = 'FREE';
+    }
+    
+    finalTotal.textContent = `R ${total.toFixed(2)}`;
+}
+
+// Confirm checkout
+function confirmCheckout() {
+    const paymentMethod = document.querySelector('input[name="payment"]:checked')?.value;
+    const fulfillment = document.querySelector('input[name="fulfillment"]:checked')?.value;
+    const deliveryZone = document.getElementById('deliveryZone')?.value;
+    const deliveryAddress = document.getElementById('deliveryAddress')?.value;
+    
+    // Validation
+    if (!paymentMethod) {
+        showNotification('Please select a payment method');
+        return;
+    }
+    
+    if (!fulfillment) {
+        showNotification('Please select pickup or delivery');
+        return;
+    }
+    
+    if (fulfillment === 'delivery') {
+        if (!deliveryZone) {
+            showNotification('Please select your delivery location');
+            return;
+        }
+        if (!deliveryAddress || deliveryAddress.trim() === '') {
+            showNotification('Please enter your delivery address');
+            return;
+        }
+    }
+    
+    // Remove modal
+    document.getElementById('checkoutModal')?.remove();
+    
+    // Process checkout
+    processCheckout(paymentMethod, fulfillment, deliveryZone, deliveryAddress);
 }
 
 // Process checkout and save order
-async function processCheckout(paymentMethod, fulfilment) {
+async function processCheckout(paymentMethod, fulfilment, deliveryZone, deliveryAddress) {
     const cart = getCart();
     const subtotal = getCartTotal();
-    const deliveryFee = fulfilment === 'delivery' ? 40 : 0;
+    
+    let deliveryFee = 0;
+    let deliveryLocation = 'N/A';
+    
+    if (fulfilment === 'delivery' && deliveryZone && DELIVERY_ZONES[deliveryZone]) {
+        deliveryFee = DELIVERY_ZONES[deliveryZone].fee;
+        deliveryLocation = DELIVERY_ZONES[deliveryZone].name;
+    }
+    
     const total = subtotal + deliveryFee;
 
     const user = JSON.parse(localStorage.getItem('pamlee_user'));
@@ -221,30 +421,100 @@ async function processCheckout(paymentMethod, fulfilment) {
         total,
         paymentMethod,
         fulfilment,
+        deliveryLocation,
+        deliveryAddress: deliveryAddress || 'N/A',
         status: 'placed',
         placedAt: Date.now()
     };
 
     try {
-        // Save to backend if API is available
-        if (window.OrdersAPI) {
-            await OrdersAPI.create(order);
-        } else {
-            // Fallback to localStorage
-            createOrder(order);
+        // Save to backend via API
+        const response = await fetch('http://localhost:3000/api/orders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(order)
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to place order');
         }
+
+        // Also save to localStorage for fallback
+        createOrder(order);
 
         // Clear cart
         localStorage.removeItem('cart');
         updateCartUI();
         closeCartModal();
 
-        // Notify user
-        alert(`✅ Order placed successfully!\n\nTracker ID: ${order.trackerId}\nTotal: R ${order.total.toFixed(2)}\n\nKeep this tracker ID to track your order.`);
+        // Show success modal
+        showOrderSuccessModal(order);
     } catch (error) {
-        alert('Failed to place order. Please try again.');
         console.error('Order error:', error);
+        
+        // Fallback: save to localStorage only
+        createOrder(order);
+        localStorage.removeItem('cart');
+        updateCartUI();
+        closeCartModal();
+        
+        showOrderSuccessModal(order);
     }
+}
+
+// Show order success modal
+function showOrderSuccessModal(order) {
+    const modal = document.createElement('div');
+    modal.innerHTML = `
+        <div class="checkout-overlay">
+          <div class="checkout-modal success-modal">
+            <div class="success-icon">✅</div>
+            <h2>Order Placed Successfully!</h2>
+            <p class="success-message">Thank you for your order. We'll start preparing it right away!</p>
+            
+            <div class="order-details-box">
+              <div class="order-detail-row">
+                <span>Tracker ID:</span>
+                <strong>${order.trackerId}</strong>
+              </div>
+              <div class="order-detail-row">
+                <span>Total Amount:</span>
+                <strong>R ${order.total.toFixed(2)}</strong>
+              </div>
+              <div class="order-detail-row">
+                <span>Payment:</span>
+                <strong>${order.paymentMethod.toUpperCase()}</strong>
+              </div>
+              <div class="order-detail-row">
+                <span>Fulfillment:</span>
+                <strong>${order.fulfilment === 'delivery' ? 'Delivery' : 'Pickup'}</strong>
+              </div>
+              ${order.fulfilment === 'delivery' ? `
+                <div class="order-detail-row">
+                  <span>Location:</span>
+                  <strong>${order.deliveryLocation}</strong>
+                </div>
+                <div class="order-detail-row">
+                  <span>Address:</span>
+                  <strong>${order.deliveryAddress}</strong>
+                </div>
+              ` : ''}
+            </div>
+            
+            <p class="tracker-note">💡 Save your Tracker ID to track your order status</p>
+            
+            <div class="success-actions">
+              <button class="btn btn-outline" onclick="this.closest('.checkout-overlay').remove()">Close</button>
+              <a href="customer.html" class="btn btn-gold">View My Orders</a>
+            </div>
+          </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
 }
 
 // ============================
