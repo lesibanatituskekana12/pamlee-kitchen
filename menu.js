@@ -76,7 +76,7 @@ function renderProducts() {
     });
 }
 
-function filterCategory(category) {
+function filterCategory(category, element) {
     currentCategory = category;
     loadProducts(category);
     
@@ -86,8 +86,10 @@ function filterCategory(category) {
         btn.classList.add('btn-outline');
     });
     
-    event.target.classList.remove('btn-outline');
-    event.target.classList.add('btn-gold', 'active');
+    if (element) {
+        element.classList.remove('btn-outline');
+        element.classList.add('btn-gold', 'active');
+    }
 }
 
 // Initialize products on page load

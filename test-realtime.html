@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RealtimeOrders Test</title>
+</head>
+<body>
+    <h1>RealtimeOrders Loading Test</h1>
+    <div id="results"></div>
+
+    <script src="realtime-orders.js?v=2"></script>
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, isSuccess) {
+            const p = document.createElement('p');
+            p.textContent = (isSuccess ? '✅ ' : '❌ ') + message;
+            p.style.color = isSuccess ? 'green' : 'red';
+            p.style.fontFamily = 'monospace';
+            p.style.padding = '5px';
+            results.appendChild(p);
+        }
+
+        // Test immediately
+        console.log('=== Testing RealtimeOrders ===');
+        console.log('typeof window.RealtimeOrders:', typeof window.RealtimeOrders);
+        console.log('window.RealtimeOrders:', window.RealtimeOrders);
+        console.log('window._realtimeOrdersLoaded:', window._realtimeOrdersLoaded);
+        console.log('window._realtimeOrdersError:', window._realtimeOrdersError);
+
+        addResult('Script executed', true);
+        addResult('Flag _realtimeOrdersLoaded: ' + window._realtimeOrdersLoaded, window._realtimeOrdersLoaded);
+        
+        if (window._realtimeOrdersError) {
+            addResult('Error occurred: ' + window._realtimeOrdersError, false);
+        }
+
+        if (typeof window.RealtimeOrders !== 'undefined' && window.RealtimeOrders !== null) {
+            addResult('RealtimeOrders is loaded', true);
+            addResult('Type: ' + typeof window.RealtimeOrders, true);
+            addResult('Constructor: ' + window.RealtimeOrders.constructor.name, true);
+            
+            // Test methods
+            const methods = ['startPolling', 'stopPolling', 'subscribe', 'getStats', 'fetchOrders', 'updateOrderStatus'];
+            methods.forEach(method => {
+                if (typeof window.RealtimeOrders[method] === 'function') {
+                    addResult(`Method ${method} exists`, true);
+                } else {
+                    addResult(`Method ${method} missing`, false);
+                }
+            });
+            
+            // Test properties
+            addResult('Has orders array: ' + Array.isArray(window.RealtimeOrders.orders), Array.isArray(window.RealtimeOrders.orders));
+            addResult('Has listeners array: ' + Array.isArray(window.RealtimeOrders.listeners), Array.isArray(window.RealtimeOrders.listeners));
+        } else {
+            addResult('RealtimeOrders is NOT loaded', false);
+            addResult('typeof: ' + typeof window.RealtimeOrders, false);
+            addResult('value: ' + window.RealtimeOrders, false);
+        }
+    </script>
+</body>
+</html>

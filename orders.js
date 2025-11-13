@@ -5,7 +5,7 @@
 // ============================
 
 // 🔢 Generate a unique tracker ID
-export function generateTrackerId() {
+function generateTrackerId() {
   return (
     "PL-" +
     Date.now().toString(36).toUpperCase() +
@@ -42,7 +42,7 @@ const orderChannel = (() => {
 // ============================
 // 💾 Create a new order
 // ============================
-export function createOrder(order) {
+function createOrder(order) {
   const all = JSON.parse(localStorage.getItem("pamlee_orders") || "[]");
 
   // add default timeline
@@ -64,7 +64,7 @@ export function createOrder(order) {
 // ============================
 // 🔄 Update order status (Admin only)
 // ============================
-export function updateOrder(trackerId, newStatus, note = "") {
+function updateOrder(trackerId, newStatus, note = "") {
   const all = JSON.parse(localStorage.getItem("pamlee_orders") || "[]");
   const idx = all.findIndex((o) => o.trackerId === trackerId);
   if (idx === -1) return;
@@ -88,21 +88,21 @@ export function updateOrder(trackerId, newStatus, note = "") {
 // ============================
 // 🧭 Listen to real-time order events
 // ============================
-export function listenOrders(callback) {
+function listenOrders(callback) {
   orderChannel.listen(callback);
 }
 
 // ============================
 // 🔍 Get all orders
 // ============================
-export function getAllOrders() {
+function getAllOrders() {
   return JSON.parse(localStorage.getItem("pamlee_orders") || "[]");
 }
 
 // ============================
 // 🔍 Get single order by tracker ID
 // ============================
-export function getOrder(trackerId) {
+function getOrder(trackerId) {
   const all = getAllOrders();
   return all.find((o) => o.trackerId === trackerId) || null;
 }
@@ -110,7 +110,7 @@ export function getOrder(trackerId) {
 // ============================
 // 🔔 Toast Notification
 // ============================
-export function notify(msg, time = 3000) {
+function notify(msg, time = 3000) {
   const div = document.createElement("div");
   div.textContent = msg;
   Object.assign(div.style, {
@@ -131,4 +131,17 @@ export function notify(msg, time = 3000) {
     div.style.opacity = "0";
     setTimeout(() => div.remove(), 300);
   }, time);
+}
+
+// Export functions to global scope
+if (typeof window !== 'undefined') {
+  window.OrdersLib = {
+    generateTrackerId,
+    createOrder,
+    updateOrder,
+    listenOrders,
+    getAllOrders,
+    getOrder,
+    notify
+  };
 }

@@ -1,17 +1,20 @@
 // Real-time Orders System
 // Handles real-time order updates using polling and BroadcastChannel
 
-// Use relative URL for API calls (works in all environments)
-const API_BASE = '/api';
-const POLL_INTERVAL = 5000; // Poll every 5 seconds
+(function() {
+    'use strict';
+    
+    // Use relative URL for API calls (works in all environments)
+    const API_BASE = '/api';
+    const POLL_INTERVAL = 5000; // Poll every 5 seconds
 
-class RealtimeOrders {
-    constructor() {
-        this.orders = [];
-        this.listeners = [];
-        this.pollTimer = null;
-        this.channel = this.initBroadcastChannel();
-    }
+    class RealtimeOrders {
+        constructor() {
+            this.orders = [];
+            this.listeners = [];
+            this.pollTimer = null;
+            this.channel = this.initBroadcastChannel();
+        }
 
     // Initialize BroadcastChannel for cross-tab communication
     initBroadcastChannel() {
@@ -218,5 +221,19 @@ class RealtimeOrders {
     }
 }
 
-// Create global instance
-window.RealtimeOrders = new RealtimeOrders();
+    // Export class and create global instance
+    if (typeof window !== 'undefined') {
+        try {
+            window.RealtimeOrdersClass = RealtimeOrders;
+            window.RealtimeOrders = new RealtimeOrders();
+            window._realtimeOrdersLoaded = true; // Flag for diagnostics
+            console.log('✅ RealtimeOrders loaded successfully');
+            console.log('RealtimeOrders instance:', window.RealtimeOrders);
+        } catch (error) {
+            console.error('❌ Failed to initialize RealtimeOrders:', error);
+            console.error('Error details:', error.message, error.stack);
+            window.RealtimeOrders = null;
+            window._realtimeOrdersError = error.message;
+        }
+    }
+})();

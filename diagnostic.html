@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Diagnostic - Pam_Lee's Kitchen</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .diagnostic-container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 2rem;
+    }
+    .diagnostic-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .diagnostic-section h2 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: var(--secondary);
+    }
+    .test-item {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      background: var(--background);
+      border-radius: 4px;
+      border-left: 4px solid transparent;
+    }
+    .test-item.success {
+      border-left-color: #10b981;
+    }
+    .test-item.error {
+      border-left-color: #ef4444;
+    }
+    .test-item.warning {
+      border-left-color: #f59e0b;
+    }
+    .test-icon {
+      margin-right: 0.75rem;
+      font-size: 1.25rem;
+    }
+    .test-content {
+      flex: 1;
+    }
+    .test-details {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+      margin-top: 0.25rem;
+    }
+    .btn-test {
+      margin-top: 1rem;
+    }
+    pre {
+      background: var(--background);
+      padding: 1rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <header class="navbar">
+    <div class="navbar-content">
+      <a href="index.html" class="navbar-brand">
+        <span class="brand-name">Pam_Lee's Kitchen</span>
+      </a>
+      <nav class="nav-links desktop-nav">
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="admin.html" class="nav-link">Admin</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="diagnostic-container">
+    <h1>System <span class="text-gradient-gold">Diagnostic</span></h1>
+    <p>This page will help identify any issues with the application.</p>
+
+    <!-- JavaScript Files -->
+    <div class="diagnostic-section">
+      <h2>JavaScript Files</h2>
+      <div id="jsFilesTests"></div>
+    </div>
+
+    <!-- API Connectivity -->
+    <div class="diagnostic-section">
+      <h2>API Connectivity</h2>
+      <div id="apiTests"></div>
+    </div>
+
+    <!-- Authentication -->
+    <div class="diagnostic-section">
+      <h2>Authentication</h2>
+      <div id="authTests"></div>
+    </div>
+
+    <!-- Database -->
+    <div class="diagnostic-section">
+      <h2>Database</h2>
+      <div id="dbTests"></div>
+    </div>
+
+    <!-- Real-Time System -->
+    <div class="diagnostic-section">
+      <h2>Real-Time System</h2>
+      <div id="realtimeTests"></div>
+    </div>
+
+    <button class="btn btn-gold btn-test" onclick="runAllTests()">Run All Tests</button>
+  </main>
+
+  <script src="api.js?v=2"></script>
+  <script src="realtime-orders.js?v=2"></script>
+  <script>
+    // Verify scripts loaded
+    console.log('=== Script Loading Check ===');
+    console.log('api.js loaded, AuthAPI:', typeof window.AuthAPI);
+    console.log('realtime-orders.js loaded, RealtimeOrders:', typeof window.RealtimeOrders);
+    console.log('RealtimeOrders value:', window.RealtimeOrders);
+    console.log('_realtimeOrdersLoaded flag:', window._realtimeOrdersLoaded);
+  </script>
+  <script>
+    // Test Results Storage
+    const testResults = {
+      jsFiles: [],
+      api: [],
+      auth: [],
+      db: [],
+      realtime: []
+    };
+
+    // Utility Functions
+    function addTest(category, name, status, details = '') {
+      const icon = status === 'success' ? '✅' : status === 'error' ? '❌' : '⚠️';
+      testResults[category].push({ name, status, details, icon });
+    }
+
+    function renderTests(category, containerId) {
+      const container = document.getElementById(containerId);
+      const tests = testResults[category];
+      
+      if (tests.length === 0) {
+        container.innerHTML = '<p style="color: var(--muted-foreground);">No tests run yet</p>';
+        return;
+      }
+
+      container.innerHTML = tests.map(test => `
+        <div class="test-item ${test.status}">
+          <span class="test-icon">${test.icon}</span>
+          <div class="test-content">
+            <strong>${test.name}</strong>
+            ${test.details ? `<div class="test-details">${test.details}</div>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Test 1: JavaScript Files
+    function testJavaScriptFiles() {
+      testResults.jsFiles = [];
+      
+      // Debug: Log what's available
+      console.log('Checking window.AuthAPI:', typeof window.AuthAPI);
+      console.log('Checking window.OrdersAPI:', typeof window.OrdersAPI);
+      console.log('Checking window.RealtimeOrders:', typeof window.RealtimeOrders);
+      console.log('Checking window.RealtimeOrdersClass:', typeof window.RealtimeOrdersClass);
+      
+      // Test AuthAPI
+      if (typeof window.AuthAPI !== 'undefined') {
+        addTest('jsFiles', 'AuthAPI loaded', 'success');
+      } else {
+        addTest('jsFiles', 'AuthAPI not loaded', 'error', 'api.js may not be loaded correctly');
+      }
+
+      // Test OrdersAPI
+      if (typeof window.OrdersAPI !== 'undefined') {
+        addTest('jsFiles', 'OrdersAPI loaded', 'success');
+      } else {
+        addTest('jsFiles', 'OrdersAPI not loaded', 'error', 'api.js may not be loaded correctly');
+      }
+
+      // Test RealtimeOrders
+      if (typeof window.RealtimeOrders !== 'undefined' && window.RealtimeOrders !== null) {
+        addTest('jsFiles', 'RealtimeOrders loaded', 'success');
+      } else {
+        let errorDetails = 'realtime-orders.js may not be loaded correctly';
+        if (window._realtimeOrdersError) {
+          errorDetails = 'Error: ' + window._realtimeOrdersError;
+        } else if (window._realtimeOrdersLoaded) {
+          errorDetails = 'Script loaded but instance is null';
+        }
+        addTest('jsFiles', 'RealtimeOrders not loaded', 'error', errorDetails);
+      }
+
+      renderTests('jsFiles', 'jsFilesTests');
+    }
+
+    // Test 2: API Connectivity
+    async function testAPIConnectivity() {
+      testResults.api = [];
+
+      // Test Products API
+      try {
+        const response = await fetch('/api/products');
+        const data = await response.json();
+        
+        if (data.success && data.products) {
+          addTest('api', 'Products API working', 'success', `${data.products.length} products`);
+        } else {
+          addTest('api', 'Products API error', 'error', 'Invalid response format');
+        }
+      } catch (error) {
+        addTest('api', 'Products API failed', 'error', error.message);
+      }
+
+      // Test Orders API
+      try {
+        const user = JSON.parse(localStorage.getItem('pamlee_user') || 'null');
+        const headers = { 'Content-Type': 'application/json' };
+        
+        if (user && user.token) {
+          headers['Authorization'] = `Bearer ${user.token}`;
+        }
+
+        const response = await fetch('/api/orders', { headers });
+        
+        if (response.status === 401 || response.status === 403) {
+          addTest('api', 'Orders API requires authentication', 'warning', 'expected');
+        } else if (response.ok) {
+          const data = await response.json();
+          addTest('api', 'Orders API working', 'success', `${data.orders?.length || 0} orders`);
+        } else {
+          addTest('api', 'Orders API error', 'error', `Status: ${response.status}`);
+        }
+      } catch (error) {
+        addTest('api', 'Orders API failed', 'error', error.message);
+      }
+
+      renderTests('api', 'apiTests');
+    }
+
+    // Test 3: Authentication
+    function testAuthentication() {
+      testResults.auth = [];
+
+      const user = JSON.parse(localStorage.getItem('pamlee_user') || 'null');
+
+      if (user) {
+        addTest('auth', 'User found', 'success', user.email);
+        addTest('auth', 'Role', 'success', user.role);
+        
+        if (user.token) {
+          addTest('auth', 'Token present', 'success');
+          
+          // Decode JWT to check expiry
+          try {
+            const payload = JSON.parse(atob(user.token.split('.')[1]));
+            const exp = payload.exp * 1000;
+            const now = Date.now();
+            
+            if (exp > now) {
+              addTest('auth', 'Token is valid', 'success', `Expires: ${new Date(exp).toLocaleString()}`);
+            } else {
+              addTest('auth', 'Token expired', 'error', 'Please log in again');
+            }
+          } catch (error) {
+            addTest('auth', 'Token validation failed', 'error', error.message);
+          }
+        } else {
+          addTest('auth', 'Token missing', 'error', 'Please log in again');
+        }
+      } else {
+        addTest('auth', 'No user logged in', 'warning', 'Some features require authentication');
+      }
+
+      renderTests('auth', 'authTests');
+    }
+
+    // Test 4: Database
+    async function testDatabase() {
+      testResults.db = [];
+
+      // Test Products table
+      try {
+        const response = await fetch('/api/products');
+        const data = await response.json();
+        
+        if (data.success) {
+          addTest('db', 'Products table', 'success', `${data.products.length} records`);
+        } else {
+          addTest('db', 'Products table error', 'error');
+        }
+      } catch (error) {
+        addTest('db', 'Products table failed', 'error', error.message);
+      }
+
+      // Test Orders table
+      try {
+        const user = JSON.parse(localStorage.getItem('pamlee_user') || 'null');
+        
+        if (user && user.token) {
+          const response = await fetch('/api/orders', {
+            headers: {
+              'Authorization': `Bearer ${user.token}`
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            addTest('db', 'Orders table', 'success', `${data.orders?.length || 0} records`);
+          } else {
+            addTest('db', 'Orders table', 'warning', 'Authentication required');
+          }
+        } else {
+          addTest('db', 'Orders table', 'warning', 'Login required to check');
+        }
+      } catch (error) {
+        addTest('db', 'Orders table failed', 'error', error.message);
+      }
+
+      renderTests('db', 'dbTests');
+    }
+
+    // Test 5: Real-Time System
+    function testRealtimeSystem() {
+      testResults.realtime = [];
+
+      if (typeof window.RealtimeOrders !== 'undefined') {
+        addTest('realtime', 'RealtimeOrders loaded', 'success');
+
+        // Test methods
+        const methods = ['startPolling', 'stopPolling', 'subscribe', 'getStats'];
+        methods.forEach(method => {
+          if (typeof window.RealtimeOrders[method] === 'function') {
+            addTest('realtime', `${method} method available`, 'success');
+          } else {
+            addTest('realtime', `${method} method missing`, 'error');
+          }
+        });
+
+        // Test BroadcastChannel support
+        if (window.BroadcastChannel) {
+          addTest('realtime', 'BroadcastChannel supported', 'success');
+        } else {
+          addTest('realtime', 'BroadcastChannel not supported', 'warning', 'Cross-tab sync disabled');
+        }
+      } else {
+        addTest('realtime', 'RealtimeOrders not loaded', 'error', 'Check realtime-orders.js');
+      }
+
+      renderTests('realtime', 'realtimeTests');
+    }
+
+    // Run All Tests
+    async function runAllTests() {
+      console.log('Running diagnostics...');
+      
+      testJavaScriptFiles();
+      await testAPIConnectivity();
+      testAuthentication();
+      await testDatabase();
+      testRealtimeSystem();
+      
+      console.log('Diagnostics complete');
+    }
+
+    // Auto-run on load (with small delay to ensure scripts are loaded)
+    window.addEventListener('DOMContentLoaded', () => {
+      // Give scripts time to initialize
+      setTimeout(() => {
+        runAllTests();
+      }, 100);
+    });
+  </script>
+</body>
+</html>
