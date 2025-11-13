@@ -162,6 +162,164 @@ const DELIVERY_ZONES = {
     'far-areas': { name: 'Far Areas (20km+)', fee: 120 }
 };
 
+// ============================
+// CARD VALIDATION FUNCTIONS
+// ============================
+
+// Luhn Algorithm for card number validation
+function validateCardNumber(cardNumber) {
+    // Remove spaces and non-digits
+    const cleaned = cardNumber.replace(/\D/g, '');
+    
+    if (cleaned.length < 13 || cleaned.length > 19) {
+        return false;
+    }
+    
+    let sum = 0;
+    let isEven = false;
+    
+    // Loop through values starting from the rightmost digit
+    for (let i = cleaned.length - 1; i >= 0; i--) {
+        let digit = parseInt(cleaned[i]);
+        
+        if (isEven) {
+            digit *= 2;
+            if (digit > 9) {
+                digit -= 9;
+            }
+        }
+        
+        sum += digit;
+        isEven = !isEven;
+    }
+    
+    return (sum % 10) === 0;
+}
+
+// Detect card type from number
+function detectCardType(cardNumber) {
+    const cleaned = cardNumber.replace(/\D/g, '');
+    
+    // Visa
+    if (/^4/.test(cleaned)) {
+        return { type: 'Visa', icon: '💳' };
+    }
+    // Mastercard
+    if (/^5[1-5]/.test(cleaned) || /^2[2-7]/.test(cleaned)) {
+        return { type: 'Mastercard', icon: '💳' };
+    }
+    // American Express
+    if (/^3[47]/.test(cleaned)) {
+        return { type: 'American Express', icon: '💳' };
+    }
+    // Discover
+    if (/^6(?:011|5)/.test(cleaned)) {
+        return { type: 'Discover', icon: '💳' };
+    }
+    
+    return { type: 'Unknown', icon: '💳' };
+}
+
+// Format card number with spaces
+function formatCardNumber(value) {
+    const cleaned = value.replace(/\D/g, '');
+    const chunks = cleaned.match(/.{1,4}/g) || [];
+    return chunks.join(' ');
+}
+
+// Format expiry date as MM/YY
+function formatExpiryDate(value) {
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length >= 2) {
+        return cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4);
+    }
+    return cleaned;
+}
+
+// Validate expiry date
+function validateExpiryDate(expiry) {
+    const parts = expiry.split('/');
+    if (parts.length !== 2) return false;
+    
+    const month = parseInt(parts[0]);
+    const year = parseInt('20' + parts[1]);
+    
+    if (month < 1 || month > 12) return false;
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    
+    if (year < currentYear) return false;
+    if (year === currentYear && month < currentMonth) return false;
+    
+    return true;
+}
+
+// Validate CVV
+function validateCVV(cvv, cardType) {
+    const cleaned = cvv.replace(/\D/g, '');
+    // American Express uses 4 digits, others use 3
+    const expectedLength = cardType === 'American Express' ? 4 : 3;
+    return cleaned.length === expectedLength;
+}
+
+// Setup card input formatting and validation
+function setupCardInputs() {
+    const cardNumberInput = document.getElementById('cardNumber');
+    const cardExpiryInput = document.getElementById('cardExpiry');
+    const cardCVVInput = document.getElementById('cardCVV');
+    const cardTypeDisplay = document.getElementById('cardType');
+    
+    if (!cardNumberInput) return;
+    
+    // Card number formatting and validation
+    cardNumberInput.addEventListener('input', (e) => {
+        const formatted = formatCardNumber(e.target.value);
+        e.target.value = formatted;
+        
+        const cardInfo = detectCardType(formatted);
+        const isValid = validateCardNumber(formatted);
+        
+        if (formatted.replace(/\D/g, '').length >= 13) {
+            if (isValid) {
+                cardTypeDisplay.textContent = `✅ Valid ${cardInfo.type} card`;
+                cardTypeDisplay.style.color = '#10b981';
+                cardNumberInput.style.borderColor = '#10b981';
+            } else {
+                cardTypeDisplay.textContent = '❌ Invalid card number';
+                cardTypeDisplay.style.color = '#ef4444';
+                cardNumberInput.style.borderColor = '#ef4444';
+            }
+        } else {
+            cardTypeDisplay.textContent = cardInfo.type !== 'Unknown' ? cardInfo.type : '';
+            cardTypeDisplay.style.color = 'var(--muted-foreground)';
+            cardNumberInput.style.borderColor = '';
+        }
+    });
+    
+    // Expiry date formatting
+    cardExpiryInput.addEventListener('input', (e) => {
+        const formatted = formatExpiryDate(e.target.value);
+        e.target.value = formatted;
+        
+        if (formatted.length === 5) {
+            if (validateExpiryDate(formatted)) {
+                cardExpiryInput.style.borderColor = '#10b981';
+            } else {
+                cardExpiryInput.style.borderColor = '#ef4444';
+            }
+        } else {
+            cardExpiryInput.style.borderColor = '';
+        }
+    });
+    
+    // CVV validation
+    cardCVVInput.addEventListener('input', (e) => {
+        e.target.value = e.target.value.replace(/\D/g, '');
+    });
+}
+
 // Checkout function (shows enhanced modal)
 function checkout() {
     const cart = getCart();
@@ -239,6 +397,32 @@ function checkout() {
                 </div>
               </div>
 
+              <!-- Card Details (shown when card is selected) -->
+              <div class="checkout-section" id="cardDetailsSection" style="display:none;">
+                <h3>💳 Card Details</h3>
+                <div style="display:grid;gap:1rem;">
+                  <div>
+                    <label style="display:block;margin-bottom:0.5rem;font-weight:500;">Card Number</label>
+                    <input type="text" id="cardNumber" class="delivery-address-input" placeholder="1234 5678 9012 3456" maxlength="19" autocomplete="cc-number">
+                    <small id="cardType" style="display:block;margin-top:0.25rem;color:var(--muted-foreground);"></small>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div>
+                      <label style="display:block;margin-bottom:0.5rem;font-weight:500;">Expiry Date</label>
+                      <input type="text" id="cardExpiry" class="delivery-address-input" placeholder="MM/YY" maxlength="5" autocomplete="cc-exp">
+                    </div>
+                    <div>
+                      <label style="display:block;margin-bottom:0.5rem;font-weight:500;">CVV</label>
+                      <input type="text" id="cardCVV" class="delivery-address-input" placeholder="123" maxlength="4" autocomplete="cc-csc">
+                    </div>
+                  </div>
+                  <div>
+                    <label style="display:block;margin-bottom:0.5rem;font-weight:500;">Cardholder Name</label>
+                    <input type="text" id="cardName" class="delivery-address-input" placeholder="Name on card" autocomplete="cc-name">
+                  </div>
+                </div>
+              </div>
+
               <!-- Fulfillment Method -->
               <div class="checkout-section">
                 <h3>🚚 Fulfillment Method</h3>
@@ -307,6 +491,19 @@ function checkout() {
     `;
     document.body.appendChild(modal);
 
+    // Add event listeners for payment method change
+    const paymentRadios = modal.querySelectorAll('input[name="payment"]');
+    paymentRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const cardDetailsSection = document.getElementById('cardDetailsSection');
+            if (e.target.value === 'card') {
+                cardDetailsSection.style.display = 'block';
+            } else {
+                cardDetailsSection.style.display = 'none';
+            }
+        });
+    });
+
     // Add event listeners for fulfillment change
     const fulfillmentRadios = modal.querySelectorAll('input[name="fulfillment"]');
     fulfillmentRadios.forEach(radio => {
@@ -322,6 +519,9 @@ function checkout() {
             }
         });
     });
+
+    // Add card input formatting and validation
+    setupCardInputs();
 }
 
 // Update checkout total based on selections
@@ -369,6 +569,50 @@ function confirmCheckout() {
     if (!paymentMethod) {
         showNotification('Please select a payment method');
         return;
+    }
+    
+    // Card payment validation
+    if (paymentMethod === 'card') {
+        const cardNumber = document.getElementById('cardNumber')?.value;
+        const cardExpiry = document.getElementById('cardExpiry')?.value;
+        const cardCVV = document.getElementById('cardCVV')?.value;
+        const cardName = document.getElementById('cardName')?.value;
+        
+        if (!cardNumber || cardNumber.trim() === '') {
+            showNotification('Please enter your card number');
+            return;
+        }
+        
+        if (!validateCardNumber(cardNumber)) {
+            showNotification('Invalid card number. Please check and try again.');
+            return;
+        }
+        
+        if (!cardExpiry || cardExpiry.trim() === '') {
+            showNotification('Please enter card expiry date');
+            return;
+        }
+        
+        if (!validateExpiryDate(cardExpiry)) {
+            showNotification('Invalid or expired card. Please check the expiry date.');
+            return;
+        }
+        
+        if (!cardCVV || cardCVV.trim() === '') {
+            showNotification('Please enter CVV');
+            return;
+        }
+        
+        const cardInfo = detectCardType(cardNumber);
+        if (!validateCVV(cardCVV, cardInfo.type)) {
+            showNotification(`Invalid CVV. ${cardInfo.type === 'American Express' ? '4 digits required' : '3 digits required'}`);
+            return;
+        }
+        
+        if (!cardName || cardName.trim() === '') {
+            showNotification('Please enter cardholder name');
+            return;
+        }
     }
     
     if (!fulfillment) {

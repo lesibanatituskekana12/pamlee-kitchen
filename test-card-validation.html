@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Validation Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin-top: 0;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input.valid {
+            border-color: #10b981;
+        }
+        input.invalid {
+            border-color: #ef4444;
+        }
+        .hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .result.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .result.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .test-cards {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 5px;
+        }
+        .test-cards h3 {
+            margin-top: 0;
+        }
+        .test-card-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        button {
+            background: #d4af37;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #b8941f;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>💳 Card Validation Test</h1>
+        
+        <div class="form-group">
+            <label>Card Number</label>
+            <input type="text" id="cardNumber" placeholder="1234 5678 9012 3456" maxlength="19">
+            <div class="hint" id="cardType"></div>
+            <div class="result" id="cardResult" style="display:none;"></div>
+        </div>
+        
+        <div class="form-group">
+            <label>Expiry Date (MM/YY)</label>
+            <input type="text" id="cardExpiry" placeholder="12/25" maxlength="5">
+            <div class="result" id="expiryResult" style="display:none;"></div>
+        </div>
+        
+        <div class="form-group">
+            <label>CVV</label>
+            <input type="text" id="cardCVV" placeholder="123" maxlength="4">
+            <div class="result" id="cvvResult" style="display:none;"></div>
+        </div>
+        
+        <div class="form-group">
+            <label>Cardholder Name</label>
+            <input type="text" id="cardName" placeholder="John Doe">
+        </div>
+        
+        <button onclick="validateAll()">Validate All</button>
+        
+        <div class="test-cards">
+            <h3>Test Card Numbers (Valid)</h3>
+            <div class="test-card-item">
+                <strong>Visa:</strong> 4532 1488 0343 6467
+            </div>
+            <div class="test-card-item">
+                <strong>Mastercard:</strong> 5425 2334 3010 9903
+            </div>
+            <div class="test-card-item">
+                <strong>American Express:</strong> 3782 822463 10005
+            </div>
+            <div class="test-card-item">
+                <strong>Discover:</strong> 6011 1111 1111 1117
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Luhn Algorithm for card number validation
+        function validateCardNumber(cardNumber) {
+            const cleaned = cardNumber.replace(/\D/g, '');
+            
+            if (cleaned.length < 13 || cleaned.length > 19) {
+                return false;
+            }
+            
+            let sum = 0;
+            let isEven = false;
+            
+            for (let i = cleaned.length - 1; i >= 0; i--) {
+                let digit = parseInt(cleaned[i]);
+                
+                if (isEven) {
+                    digit *= 2;
+                    if (digit > 9) {
+                        digit -= 9;
+                    }
+                }
+                
+                sum += digit;
+                isEven = !isEven;
+            }
+            
+            return (sum % 10) === 0;
+        }
+
+        // Detect card type
+        function detectCardType(cardNumber) {
+            const cleaned = cardNumber.replace(/\D/g, '');
+            
+            if (/^4/.test(cleaned)) {
+                return { type: 'Visa', icon: '💳' };
+            }
+            if (/^5[1-5]/.test(cleaned) || /^2[2-7]/.test(cleaned)) {
+                return { type: 'Mastercard', icon: '💳' };
+            }
+            if (/^3[47]/.test(cleaned)) {
+                return { type: 'American Express', icon: '💳' };
+            }
+            if (/^6(?:011|5)/.test(cleaned)) {
+                return { type: 'Discover', icon: '💳' };
+            }
+            
+            return { type: 'Unknown', icon: '💳' };
+        }
+
+        // Format card number
+        function formatCardNumber(value) {
+            const cleaned = value.replace(/\D/g, '');
+            const chunks = cleaned.match(/.{1,4}/g) || [];
+            return chunks.join(' ');
+        }
+
+        // Format expiry date
+        function formatExpiryDate(value) {
+            const cleaned = value.replace(/\D/g, '');
+            if (cleaned.length >= 2) {
+                return cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4);
+            }
+            return cleaned;
+        }
+
+        // Validate expiry date
+        function validateExpiryDate(expiry) {
+            const parts = expiry.split('/');
+            if (parts.length !== 2) return false;
+            
+            const month = parseInt(parts[0]);
+            const year = parseInt('20' + parts[1]);
+            
+            if (month < 1 || month > 12) return false;
+            
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth() + 1;
+            
+            if (year < currentYear) return false;
+            if (year === currentYear && month < currentMonth) return false;
+            
+            return true;
+        }
+
+        // Validate CVV
+        function validateCVV(cvv, cardType) {
+            const cleaned = cvv.replace(/\D/g, '');
+            const expectedLength = cardType === 'American Express' ? 4 : 3;
+            return cleaned.length === expectedLength;
+        }
+
+        // Setup inputs
+        const cardNumberInput = document.getElementById('cardNumber');
+        const cardExpiryInput = document.getElementById('cardExpiry');
+        const cardCVVInput = document.getElementById('cardCVV');
+        const cardTypeDisplay = document.getElementById('cardType');
+        const cardResult = document.getElementById('cardResult');
+        const expiryResult = document.getElementById('expiryResult');
+        const cvvResult = document.getElementById('cvvResult');
+
+        cardNumberInput.addEventListener('input', (e) => {
+            const formatted = formatCardNumber(e.target.value);
+            e.target.value = formatted;
+            
+            const cardInfo = detectCardType(formatted);
+            const isValid = validateCardNumber(formatted);
+            
+            if (formatted.replace(/\D/g, '').length >= 13) {
+                if (isValid) {
+                    cardTypeDisplay.textContent = `✅ Valid ${cardInfo.type} card`;
+                    cardTypeDisplay.style.color = '#10b981';
+                    cardNumberInput.className = 'valid';
+                    cardResult.textContent = '✅ Card number is valid';
+                    cardResult.className = 'result success';
+                    cardResult.style.display = 'block';
+                } else {
+                    cardTypeDisplay.textContent = '❌ Invalid card number';
+                    cardTypeDisplay.style.color = '#ef4444';
+                    cardNumberInput.className = 'invalid';
+                    cardResult.textContent = '❌ Card number is invalid';
+                    cardResult.className = 'result error';
+                    cardResult.style.display = 'block';
+                }
+            } else {
+                cardTypeDisplay.textContent = cardInfo.type !== 'Unknown' ? cardInfo.type : '';
+                cardTypeDisplay.style.color = '#666';
+                cardNumberInput.className = '';
+                cardResult.style.display = 'none';
+            }
+        });
+
+        cardExpiryInput.addEventListener('input', (e) => {
+            const formatted = formatExpiryDate(e.target.value);
+            e.target.value = formatted;
+            
+            if (formatted.length === 5) {
+                if (validateExpiryDate(formatted)) {
+                    cardExpiryInput.className = 'valid';
+                    expiryResult.textContent = '✅ Valid expiry date';
+                    expiryResult.className = 'result success';
+                    expiryResult.style.display = 'block';
+                } else {
+                    cardExpiryInput.className = 'invalid';
+                    expiryResult.textContent = '❌ Invalid or expired date';
+                    expiryResult.className = 'result error';
+                    expiryResult.style.display = 'block';
+                }
+            } else {
+                cardExpiryInput.className = '';
+                expiryResult.style.display = 'none';
+            }
+        });
+
+        cardCVVInput.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '');
+            
+            const cardInfo = detectCardType(cardNumberInput.value);
+            if (e.target.value.length > 0) {
+                if (validateCVV(e.target.value, cardInfo.type)) {
+                    cardCVVInput.className = 'valid';
+                    cvvResult.textContent = '✅ Valid CVV';
+                    cvvResult.className = 'result success';
+                    cvvResult.style.display = 'block';
+                } else {
+                    cardCVVInput.className = 'invalid';
+                    cvvResult.textContent = `❌ ${cardInfo.type === 'American Express' ? '4 digits required' : '3 digits required'}`;
+                    cvvResult.className = 'result error';
+                    cvvResult.style.display = 'block';
+                }
+            } else {
+                cardCVVInput.className = '';
+                cvvResult.style.display = 'none';
+            }
+        });
+
+        function validateAll() {
+            const cardNumber = cardNumberInput.value;
+            const expiry = cardExpiryInput.value;
+            const cvv = cardCVVInput.value;
+            const name = document.getElementById('cardName').value;
+            
+            let errors = [];
+            
+            if (!validateCardNumber(cardNumber)) {
+                errors.push('Invalid card number');
+            }
+            if (!validateExpiryDate(expiry)) {
+                errors.push('Invalid expiry date');
+            }
+            const cardInfo = detectCardType(cardNumber);
+            if (!validateCVV(cvv, cardInfo.type)) {
+                errors.push('Invalid CVV');
+            }
+            if (!name || name.trim() === '') {
+                errors.push('Cardholder name required');
+            }
+            
+            if (errors.length === 0) {
+                alert('✅ All card details are valid!\n\nCard Type: ' + cardInfo.type);
+            } else {
+                alert('❌ Validation errors:\n\n' + errors.join('\n'));
+            }
+        }
+    </script>
+</body>
+</html>
