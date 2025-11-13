@@ -26,6 +26,50 @@ const ORDER_STATUSES = {
     'cancelled': { label: 'Cancelled', color: '#ef4444', icon: '❌' }
 };
 
+// Utility Functions (defined early to avoid hoisting issues)
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease-out';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+function getTimeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+function playNotificationSound() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (error) {
+        console.error('Error playing notification sound:', error);
+    }
+}
+
 // Initialize Dashboard
 document.addEventListener('DOMContentLoaded', () => {
     setupNavbar();
@@ -67,25 +111,37 @@ function logout() {
 
 // Initialize Dashboard
 async function initializeDashboard() {
-    // Subscribe to order updates first
-    window.RealtimeOrders.subscribe((orders) => {
-        updateStats(orders);
-        renderOrders(orders);
-    });
-    
-    // Play notification sound for new orders
-    let lastOrderCount = 0;
-    window.RealtimeOrders.subscribe((orders) => {
-        const newOrderCount = orders.filter(o => o.status === 'placed').length;
-        if (newOrderCount > lastOrderCount && lastOrderCount > 0) {
-            playNotificationSound();
-            showToast('🔔 New order received!');
-        }
-        lastOrderCount = newOrderCount;
-    });
-    
-    // Start real-time polling (this will trigger the subscriptions)
-    await window.RealtimeOrders.startPolling('admin');
+    // Check if RealtimeOrders is available
+    if (!window.RealtimeOrders) {
+        console.error('RealtimeOrders not loaded!');
+        showToast('❌ Error: Real-time system not available. Please refresh the page.');
+        return;
+    }
+
+    try {
+        // Subscribe to order updates first
+        window.RealtimeOrders.subscribe((orders) => {
+            updateStats(orders);
+            renderOrders(orders);
+        });
+        
+        // Play notification sound for new orders
+        let lastOrderCount = 0;
+        window.RealtimeOrders.subscribe((orders) => {
+            const newOrderCount = orders.filter(o => o.status === 'placed').length;
+            if (newOrderCount > lastOrderCount && lastOrderCount > 0) {
+                playNotificationSound();
+                showToast('🔔 New order received!');
+            }
+            lastOrderCount = newOrderCount;
+        });
+        
+        // Start real-time polling (this will trigger the subscriptions)
+        await window.RealtimeOrders.startPolling('admin');
+    } catch (error) {
+        console.error('Error initializing dashboard:', error);
+        showToast('❌ Error loading orders. Please refresh the page.');
+    }
 }
 
 // Update Statistics
@@ -212,11 +268,17 @@ function renderOrderCard(order) {
 
 // Update Order Status
 async function updateOrderStatus(trackerId, newStatus) {
+    if (!window.RealtimeOrders) {
+        showToast('❌ Real-time system not available');
+        return;
+    }
+    
     try {
         const note = prompt('Add a note (optional):');
         await window.RealtimeOrders.updateOrderStatus(trackerId, newStatus, note || '');
         showToast(`✅ Order ${trackerId} updated to ${ORDER_STATUSES[newStatus].label}`);
     } catch (error) {
+        console.error('Error updating order:', error);
         showToast(`❌ Failed to update order: ${error.message}`);
     }
 }
@@ -235,9 +297,19 @@ function filterOrders(status) {
 
 // View Order Details
 function viewOrderDetails(trackerId) {
+    if (!window.RealtimeOrders) {
+        showToast('❌ Real-time system not available');
+        return;
+    }
+    
     window.RealtimeOrders.getOrder(trackerId).then(order => {
-        showOrderDetailsModal(order);
+        if (order) {
+            showOrderDetailsModal(order);
+        } else {
+            showToast('❌ Order not found');
+        }
     }).catch(error => {
+        console.error('Error fetching order:', error);
         showToast(`❌ ${error.message}`);
     });
 }
@@ -346,48 +418,9 @@ function showOrderDetailsModal(order) {
     document.body.appendChild(modal);
 }
 
-// Utility Functions
-function getTimeAgo(date) {
-    const seconds = Math.floor((new Date() - date) / 1000);
-    
-    if (seconds < 60) return 'Just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    return `${Math.floor(seconds / 86400)}d ago`;
-}
-
-function showToast(message) {
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.style.animation = 'slideOut 0.3s ease-out';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-function playNotificationSound() {
-    // Create a simple beep sound
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.value = 800;
-    oscillator.type = 'sine';
-    
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.5);
-}
-
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
-    window.RealtimeOrders.stopPolling();
+    if (window.RealtimeOrders && typeof window.RealtimeOrders.stopPolling === 'function') {
+        window.RealtimeOrders.stopPolling();
+    }
 });
