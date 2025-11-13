@@ -13,10 +13,26 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // Initialize SQLite database
 // Use in-memory database for Vercel, file-based for local
-const dbPath = process.env.VERCEL ? ':memory:' : 'pamlee.db';
-const db = new Database(dbPath);
-if (!process.env.VERCEL) {
-  db.pragma('journal_mode = WAL');
+let db;
+let dbPath;
+
+try {
+  dbPath = process.env.VERCEL ? ':memory:' : 'pamlee.db';
+  db = new Database(dbPath);
+  if (!process.env.VERCEL) {
+    db.pragma('journal_mode = WAL');
+  }
+  console.log(`✅ Database initialized: ${dbPath}`);
+} catch (error) {
+  console.error('❌ Database initialization failed:', error.message);
+  // Create mock database for Vercel if SQLite fails
+  if (process.env.VERCEL) {
+    console.log('⚠️ Using mock database for Vercel');
+    dbPath = 'mock';
+    db = null;
+  } else {
+    throw error;
+  }
 }
 
 // Middleware
@@ -25,9 +41,36 @@ app.use(express.json());
 app.use(express.static('.'));
 
 // ============================
+// Mock Data for Vercel (when SQLite fails)
+// ============================
+const MOCK_PRODUCTS = [
+  { id: '1', name: 'Chocolate Cake', description: 'Rich chocolate layers with creamy frosting', category: 'cakes', price: 250, image: 'src/assets/chocolate-cake.jpg', is_popular: 1 },
+  { id: '2', name: 'Vanilla Cupcakes', description: 'Light and fluffy vanilla cupcakes', category: 'cupcakes', price: 35, image: 'src/assets/vanilla-cupcakes.jpg', is_popular: 1 },
+  { id: '3', name: 'Sourdough Bread', description: 'Artisan sourdough with crispy crust', category: 'bread', price: 45, image: 'src/assets/sourdough.jpg', is_popular: 0 },
+  { id: '4', name: 'Croissants', description: 'Buttery, flaky French pastries', category: 'pastries', price: 25, image: 'src/assets/croissants.jpg', is_popular: 1 },
+  { id: '5', name: 'Blueberry Muffins', description: 'Fresh blueberries in every bite', category: 'muffins', price: 30, image: 'src/assets/blueberry-muffins.jpg', is_popular: 0 },
+  { id: '6', name: 'Red Velvet Cake', description: 'Classic red velvet with cream cheese frosting', category: 'cakes', price: 280, image: 'src/assets/red-velvet.jpg', is_popular: 1 },
+  { id: '7', name: 'Chocolate Chip Cookies', description: 'Warm, gooey chocolate chip cookies', category: 'pastries', price: 20, image: 'src/assets/cookies.jpg', is_popular: 0 },
+  { id: '8', name: 'Lemon Tart', description: 'Tangy lemon filling in buttery crust', category: 'pastries', price: 55, image: 'src/assets/lemon-tart.jpg', is_popular: 0 }
+];
+
+const MOCK_ADMIN = {
+  id: 1,
+  email: 'admin@pamlee.co.za',
+  password: '$2a$10$rN8qH5xH5xH5xH5xH5xH5.O5xH5xH5xH5xH5xH5xH5xH5xH5xH5xH', // admin123
+  name: 'Admin',
+  role: 'admin'
+};
+
+// ============================
 // Database Schema
 // ============================
 function initDatabase() {
+  if (!db) {
+    console.log('⚠️ Skipping database initialization (using mock data)');
+    return;
+  }
+  
   // Users table
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -189,14 +232,25 @@ app.post('/api/auth/login', (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    let user;
+    
+    if (!db) {
+      // Use mock admin when database is not available
+      if (email === MOCK_ADMIN.email && password === 'admin123') {
+        user = MOCK_ADMIN;
+      } else {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+    } else {
+      user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
 
-    const validPassword = bcrypt.compareSync(password, user.password);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      const validPassword = bcrypt.compareSync(password, user.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
     }
 
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -240,10 +294,18 @@ app.get('/api/products', (req, res) => {
     const { category } = req.query;
     let products;
 
-    if (category && category !== 'all') {
-      products = db.prepare('SELECT * FROM products WHERE category = ?').all(category);
+    if (!db) {
+      // Use mock data when database is not available
+      products = MOCK_PRODUCTS;
+      if (category && category !== 'all') {
+        products = products.filter(p => p.category === category);
+      }
     } else {
-      products = db.prepare('SELECT * FROM products').all();
+      if (category && category !== 'all') {
+        products = db.prepare('SELECT * FROM products WHERE category = ?').all(category);
+      } else {
+        products = db.prepare('SELECT * FROM products').all();
+      }
     }
 
     res.json({
@@ -255,7 +317,7 @@ app.get('/api/products', (req, res) => {
         category: p.category,
         price: p.price,
         image: p.image,
-        isPopular: p.is_popular === 1
+        isPopular: p.is_popular === 1 || p.is_popular === true
       }))
     });
   } catch (error) {
