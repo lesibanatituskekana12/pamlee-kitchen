@@ -7,6 +7,14 @@ if (!user) {
     window.location.href = 'login.html';
 }
 
+// Check if user has a valid token
+if (!user.token) {
+    console.warn('No authentication token found. Please log in again.');
+    alert('Your session has expired. Please log in again.');
+    localStorage.removeItem('pamlee_user');
+    window.location.href = 'login.html';
+}
+
 // Order Status Configuration
 const ORDER_STATUSES = {
     'placed': { label: 'Order Placed', color: '#3b82f6', icon: '📝', progress: 20 },
@@ -59,11 +67,8 @@ function logout() {
 }
 
 // Initialize Dashboard
-function initializeDashboard() {
-    // Start real-time polling
-    window.RealtimeOrders.startPolling('customer', user.email);
-    
-    // Subscribe to order updates
+async function initializeDashboard() {
+    // Subscribe to order updates first
     window.RealtimeOrders.subscribe((orders) => {
         renderOrders(orders);
     });
@@ -80,6 +85,9 @@ function initializeDashboard() {
             lastStatuses[order.trackerId] = order.status;
         });
     });
+    
+    // Start real-time polling (this will trigger the subscriptions)
+    await window.RealtimeOrders.startPolling('customer', user.email);
 }
 
 // Render Orders
@@ -404,6 +412,10 @@ function showToast(message) {
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
+
+// Expose functions globally for onclick handlers
+window.viewOrderDetails = viewOrderDetails;
+window.trackOrder = trackOrder;
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {

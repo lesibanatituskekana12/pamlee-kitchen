@@ -1,7 +1,8 @@
 // Real-time Orders System
 // Handles real-time order updates using polling and BroadcastChannel
 
-const API_BASE = 'http://localhost:3000/api';
+// Use relative URL for API calls (works in all environments)
+const API_BASE = '/api';
 const POLL_INTERVAL = 5000; // Poll every 5 seconds
 
 class RealtimeOrders {
@@ -27,11 +28,11 @@ class RealtimeOrders {
     }
 
     // Start polling for orders
-    startPolling(userRole = 'customer', userEmail = null) {
+    async startPolling(userRole = 'customer', userEmail = null) {
         this.stopPolling();
         
-        // Initial fetch
-        this.fetchOrders(userRole, userEmail);
+        // Initial fetch (wait for it to complete)
+        await this.fetchOrders(userRole, userEmail);
         
         // Poll every 5 seconds
         this.pollTimer = setInterval(() => {
@@ -71,6 +72,13 @@ class RealtimeOrders {
             const response = await fetch(`${API_BASE}/orders`, { headers });
             
             if (!response.ok) {
+                // If unauthorized, fall back to localStorage
+                if (response.status === 401 || response.status === 403) {
+                    console.warn('Not authenticated, using localStorage fallback');
+                    this.orders = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
+                    this.notifyListeners(this.orders);
+                    return;
+                }
                 throw new Error('Failed to fetch orders');
             }
 
@@ -95,6 +103,11 @@ class RealtimeOrders {
             // Fallback to localStorage
             this.orders = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
             this.notifyListeners(this.orders);
+            
+            // Show error to user if no orders in localStorage either
+            if (this.orders.length === 0) {
+                console.warn('No orders found in API or localStorage');
+            }
         }
     }
 
@@ -162,10 +175,8 @@ class RealtimeOrders {
     subscribe(callback) {
         this.listeners.push(callback);
         
-        // Immediately call with current orders
-        if (this.orders.length > 0) {
-            callback(this.orders);
-        }
+        // Immediately call with current orders (even if empty)
+        callback(this.orders);
         
         // Return unsubscribe function
         return () => {

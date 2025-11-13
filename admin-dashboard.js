@@ -7,6 +7,14 @@ if (!user || user.role !== 'admin') {
     window.location.href = 'login.html';
 }
 
+// Check if user has a valid token
+if (!user.token) {
+    console.warn('No authentication token found. Please log in again.');
+    alert('Your session has expired. Please log in again.');
+    localStorage.removeItem('pamlee_user');
+    window.location.href = 'login.html';
+}
+
 // Order Status Options
 const ORDER_STATUSES = {
     'placed': { label: 'Placed', color: '#3b82f6', icon: '📝' },
@@ -58,11 +66,8 @@ function logout() {
 }
 
 // Initialize Dashboard
-function initializeDashboard() {
-    // Start real-time polling
-    window.RealtimeOrders.startPolling('admin');
-    
-    // Subscribe to order updates
+async function initializeDashboard() {
+    // Subscribe to order updates first
     window.RealtimeOrders.subscribe((orders) => {
         updateStats(orders);
         renderOrders(orders);
@@ -78,6 +83,9 @@ function initializeDashboard() {
         }
         lastOrderCount = newOrderCount;
     });
+    
+    // Start real-time polling (this will trigger the subscriptions)
+    await window.RealtimeOrders.startPolling('admin');
 }
 
 // Update Statistics
@@ -89,7 +97,7 @@ function updateStats(orders) {
     document.getElementById('pendingOrders').textContent = stats.pending + stats.preparing;
     
     // Get product count from API or default
-    fetch('http://localhost:3000/api/products')
+    fetch('/api/products')
         .then(res => res.json())
         .then(data => {
             if (data.success) {
@@ -233,6 +241,11 @@ function viewOrderDetails(trackerId) {
         showToast(`❌ ${error.message}`);
     });
 }
+
+// Expose functions globally for onclick handlers
+window.updateOrderStatus = updateOrderStatus;
+window.filterOrders = filterOrders;
+window.viewOrderDetails = viewOrderDetails;
 
 // Show Order Details Modal
 function showOrderDetailsModal(order) {

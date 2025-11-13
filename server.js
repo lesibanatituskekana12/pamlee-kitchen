@@ -419,6 +419,8 @@ app.get('/api/orders/:trackerId', (req, res) => {
         total: order.total,
         paymentMethod: order.payment_method,
         fulfilment: order.fulfilment,
+        deliveryLocation: order.delivery_location,
+        deliveryAddress: order.delivery_address,
         status: order.status,
         timeline: JSON.parse(order.timeline || '[]'),
         placedAt: order.placed_at,
