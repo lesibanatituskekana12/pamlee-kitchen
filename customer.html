@@ -62,18 +62,40 @@
 
 <body>
   <header class="navbar">
-    <div class="container navbar-content">
-      <div class="navbar-brand">
+    <div class="navbar-content">
+      <a href="index.html" class="navbar-brand">
         <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
         </svg>
-        <span class="brand-name">My Dashboard</span>
-      </div>
-      <div class="nav-actions">
-        <a href="index.html" class="btn btn-outline">← Back to Home</a>
-        <button id="logoutBtn" class="btn btn-gold">Sign Out</button>
+        <span class="brand-name">Pam_Lee's Kitchen</span>
+      </a>
+
+      <nav class="nav-links desktop-nav">
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="menu.html" class="nav-link">Menu</a>
+        <a href="gallery.html" class="nav-link">Gallery</a>
+        <a href="contact.html" class="nav-link">Contact</a>
+      </nav>
+
+      <div class="nav-actions" id="userActions">
+        <button class="btn-icon mobile-menu-toggle" id="menuToggle">
+          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
       </div>
     </div>
+
+    <!-- Mobile Nav -->
+    <nav class="mobile-nav" id="mobileNav">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="menu.html" class="nav-link">Menu</a>
+      <a href="gallery.html" class="nav-link">Gallery</a>
+      <a href="contact.html" class="nav-link">Contact</a>
+      <div id="mobileUserLinks"></div>
+    </nav>
   </header>
 
   <main class="page-content">
@@ -101,6 +123,7 @@
 
   <script src="api.js"></script>
   <script src="orders.js"></script>
+  <script src="script.js"></script>
   <script>
     // ==========================
     // 🔐 USER VALIDATION
@@ -111,15 +134,52 @@
       window.location.href = 'login.html';
     }
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-      if (window.AuthAPI) {
-        AuthAPI.logout();
-      } else {
-        localStorage.removeItem('pamlee_user');
-        alert('Signed out successfully.');
-        window.location.href = 'login.html';
-      }
-    });
+    // Populate navbar user actions
+    const actionsDiv = document.getElementById('userActions');
+    const mobileUserLinks = document.getElementById('mobileUserLinks');
+    
+    if (user) {
+      const name = user.email.split('@')[0];
+      actionsDiv.innerHTML = `
+        <span style="margin-left:1rem;">👤 Hi, ${name}</span>
+        <a href="customer.html" class="btn btn-outline" style="margin-left:1rem;">My Dashboard</a>
+        <button id="logoutBtn" class="btn btn-gold" style="margin-left:1rem;">Sign Out</button>
+        <button class="btn-icon mobile-menu-toggle" id="menuToggle">
+          <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>`;
+      
+      // Add to mobile menu
+      mobileUserLinks.innerHTML = `
+        <div style="border-top: 1px solid var(--border); margin-top: 0.5rem; padding-top: 0.5rem;">
+          <a href="customer.html" class="nav-link active">👤 My Dashboard</a>
+          <a href="#" class="nav-link" id="mobileLogoutBtn">🚪 Sign Out</a>
+        </div>`;
+      
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        if (window.AuthAPI) {
+          AuthAPI.logout();
+        } else {
+          localStorage.removeItem('pamlee_user');
+          alert('Signed out successfully.');
+          window.location.href = 'login.html';
+        }
+      });
+      
+      document.getElementById('mobileLogoutBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        if (window.AuthAPI) {
+          AuthAPI.logout();
+        } else {
+          localStorage.removeItem('pamlee_user');
+          alert('Signed out successfully.');
+          window.location.href = 'login.html';
+        }
+      });
+    }
 
     // ==========================
     // 📦 LOAD AND RENDER ORDERS

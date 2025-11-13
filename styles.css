@@ -222,7 +222,7 @@ img {
     border-radius: 50%;
     width: 18px;
     height: 18px;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     font-size: 0.65rem;
@@ -231,8 +231,8 @@ img {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
-.cart-badge:empty {
-    display: none;
+.cart-badge:not(:empty) {
+    display: flex;
 }
 
 #cartBtn.bounce {
@@ -314,6 +314,14 @@ img {
 
 .mobile-nav .nav-link:active {
     background: rgba(212, 165, 116, 0.15);
+}
+
+#mobileUserLinks {
+    width: 100%;
+}
+
+#mobileUserLinks .nav-link {
+    padding: 0.875rem 1.5rem;
 }
 
 /* Mobile Menu Overlay */

@@ -69,8 +69,12 @@ function updateCartUI() {
     const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
     if (cartCount) {
         const oldCount = parseInt(cartCount.textContent) || 0;
-        cartCount.textContent = totalItems;
-        cartCount.style.display = totalItems > 0 ? 'flex' : 'none';
+        
+        if (totalItems > 0) {
+            cartCount.textContent = totalItems;
+        } else {
+            cartCount.textContent = '';
+        }
         
         // Trigger bounce animation when items are added
         if (totalItems > oldCount && cartBtn) {
