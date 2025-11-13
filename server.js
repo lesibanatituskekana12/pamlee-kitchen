@@ -489,8 +489,10 @@ app.get('/api/stats', authenticateToken, requireAdmin, (req, res) => {
 // ============================
 initDatabase();
 
-app.listen(PORT, () => {
-  console.log(`
+// Start server (only if not in Vercel serverless environment)
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`
 ╔════════════════════════════════════════╗
 ║   Pam_Lee's Kitchen Backend Server     ║
 ╠════════════════════════════════════════╣
@@ -499,12 +501,16 @@ app.listen(PORT, () => {
 ║  🔐 Admin: admin@pamlee.co.za          ║
 ║  🔑 Password: admin123                 ║
 ╚════════════════════════════════════════╝
-  `);
-});
+    `);
+  });
 
-// Graceful shutdown
-process.on('SIGINT', () => {
-  db.close();
-  console.log('\n✅ Database connection closed');
-  process.exit(0);
-});
+  // Graceful shutdown
+  process.on('SIGINT', () => {
+    db.close();
+    console.log('\n✅ Database connection closed');
+    process.exit(0);
+  });
+}
+
+// Export for Vercel serverless
+module.exports = app;
