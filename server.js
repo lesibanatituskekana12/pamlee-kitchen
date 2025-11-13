@@ -12,8 +12,12 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // Initialize SQLite database
-const db = new Database('pamlee.db');
-db.pragma('journal_mode = WAL');
+// Use in-memory database for Vercel, file-based for local
+const dbPath = process.env.VERCEL ? ':memory:' : 'pamlee.db';
+const db = new Database(dbPath);
+if (!process.env.VERCEL) {
+  db.pragma('journal_mode = WAL');
+}
 
 // Middleware
 app.use(cors());
@@ -214,6 +218,18 @@ app.get('/api/auth/me', authenticateToken, (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// ============================
+// API Routes - Health Check
+// ============================
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API is running',
+    timestamp: new Date().toISOString(),
+    database: dbPath
+  });
 });
 
 // ============================
@@ -487,6 +503,8 @@ app.get('/api/stats', authenticateToken, requireAdmin, (req, res) => {
 // ============================
 // Initialize and Start Server
 // ============================
+
+// Initialize database immediately (important for serverless)
 initDatabase();
 
 // Start server (only if not in Vercel serverless environment)
@@ -497,7 +515,7 @@ if (process.env.VERCEL !== '1') {
 ║   Pam_Lee's Kitchen Backend Server     ║
 ╠════════════════════════════════════════╣
 ║  🚀 Server running on port ${PORT}       ║
-║  📊 Database: pamlee.db                ║
+║  📊 Database: ${dbPath}                ║
 ║  🔐 Admin: admin@pamlee.co.za          ║
 ║  🔑 Password: admin123                 ║
 ╚════════════════════════════════════════╝
