@@ -209,16 +209,16 @@
     const actionsDiv = document.getElementById('userActions');
     if (user) {
       const name = user.email.split('@')[0];
-      actionsDiv.innerHTML += `
+      actionsDiv.insertAdjacentHTML('beforeend', `
         <span style="margin-left:1rem;">👤 Hi, ${name}</span>
-        <button id="logoutBtn" class="btn btn-gold" style="margin-left:1rem;">Sign Out</button>`;
+        <button id="logoutBtn" class="btn btn-gold" style="margin-left:1rem;">Sign Out</button>`);
       document.getElementById('logoutBtn').addEventListener('click', () => {
         localStorage.removeItem('pamlee_user');
         alert('Signed out successfully!');
         window.location.href = 'login.html';
       });
     } else {
-      actionsDiv.innerHTML += `<a href="login.html" class="btn btn-gold" style="margin-left:1rem;">Sign In</a>`;
+      actionsDiv.insertAdjacentHTML('beforeend', `<a href="login.html" class="btn btn-gold" style="margin-left:1rem;">Sign In</a>`);
     }
   </script>
 </body>

@@ -70,10 +70,13 @@ function updateCartUI() {
     if (cartCount) {
         const oldCount = parseInt(cartCount.textContent) || 0;
         
+        // Update badge content and visibility using class
         if (totalItems > 0) {
             cartCount.textContent = totalItems;
+            cartCount.classList.add('has-items');
         } else {
             cartCount.textContent = '';
+            cartCount.classList.remove('has-items');
         }
         
         // Trigger bounce animation when items are added
@@ -292,7 +295,10 @@ function closeCartModal() {
 // Initialize cart on page load
 // ============================
 document.addEventListener('DOMContentLoaded', () => {
-    updateCartUI();
+    // Delay updateCartUI to ensure all DOM modifications are complete
+    setTimeout(() => {
+        updateCartUI();
+    }, 100);
 
     const cartBtn = document.getElementById('cartBtn');
     if (cartBtn) cartBtn.addEventListener('click', openCartModal);
@@ -305,6 +311,20 @@ document.addEventListener('DOMContentLoaded', () => {
         cartModal.addEventListener('click', (e) => {
             if (e.target === cartModal) closeCartModal();
         });
+    }
+});
+
+// Also update cart UI when page becomes visible (handles page navigation)
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        updateCartUI();
+    }
+});
+
+// Update cart UI when localStorage changes (for multi-tab sync)
+window.addEventListener('storage', (e) => {
+    if (e.key === 'cart') {
+        updateCartUI();
     }
 });
 

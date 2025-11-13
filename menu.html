@@ -138,9 +138,9 @@
     
     if (user) {
       const name = user.email.split('@')[0];
-      actionsDiv.innerHTML += `
+      actionsDiv.insertAdjacentHTML('beforeend', `
         <span style="margin-left:1rem;">👤 Hi, ${name}</span>
-        <button id="logoutBtn" class="btn btn-gold" style="margin-left:1rem;">Sign Out</button>`;
+        <button id="logoutBtn" class="btn btn-gold" style="margin-left:1rem;">Sign Out</button>`);
       
       // Add to mobile menu
       mobileUserLinks.innerHTML = `
@@ -162,7 +162,7 @@
         window.location.href = 'login.html';
       });
     } else {
-      actionsDiv.innerHTML += `<a href="login.html" class="btn btn-gold" style="margin-left:1rem;">Sign In</a>`;
+      actionsDiv.insertAdjacentHTML('beforeend', `<a href="login.html" class="btn btn-gold" style="margin-left:1rem;">Sign In</a>`);
       
       // Add to mobile menu
       mobileUserLinks.innerHTML = `

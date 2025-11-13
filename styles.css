@@ -222,7 +222,7 @@ img {
     border-radius: 50%;
     width: 18px;
     height: 18px;
-    display: none;
+    display: none !important;
     align-items: center;
     justify-content: center;
     font-size: 0.65rem;
@@ -231,8 +231,9 @@ img {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
-.cart-badge:not(:empty) {
-    display: flex;
+.cart-badge:not(:empty),
+.cart-badge.has-items {
+    display: flex !important;
 }
 
 #cartBtn.bounce {
