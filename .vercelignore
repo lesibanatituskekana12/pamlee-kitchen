@@ -1,0 +1,12 @@
+node_modules
+.git
+.env
+*.log
+pamlee.db-shm
+pamlee.db-wal
+test-*.html
+diagnostic.html
+ADMIN_DASHBOARD_FIXES.md
+CHANGELOG.md
+DEPLOY_NOW.md
+VERCEL_DEPLOYMENT.md
