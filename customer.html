@@ -99,6 +99,7 @@
     </div>
   </footer>
 
+  <script src="api.js"></script>
   <script src="orders.js"></script>
   <script>
     // ==========================
@@ -111,9 +112,13 @@
     }
 
     document.getElementById('logoutBtn').addEventListener('click', () => {
-      localStorage.removeItem('pamlee_user');
-      alert('Signed out successfully.');
-      window.location.href = 'login.html';
+      if (window.AuthAPI) {
+        AuthAPI.logout();
+      } else {
+        localStorage.removeItem('pamlee_user');
+        alert('Signed out successfully.');
+        window.location.href = 'login.html';
+      }
     });
 
     // ==========================
@@ -122,9 +127,20 @@
     const container = document.getElementById('ordersContainer');
     const currentUser = user?.email;
 
-    function getUserOrders() {
-      const all = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
-      return all.filter(o => o.userEmail === currentUser);
+    async function getUserOrders() {
+      try {
+        if (window.OrdersAPI) {
+          const data = await OrdersAPI.getAll();
+          return data.orders || [];
+        } else {
+          // Fallback to localStorage
+          const all = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
+          return all.filter(o => o.userEmail === currentUser);
+        }
+      } catch (error) {
+        console.error('Failed to load orders:', error);
+        return [];
+      }
     }
 
     function isAfter(current, step) {
@@ -140,20 +156,24 @@
       setTimeout(() => t.remove(), 2500);
     }
 
-    function renderOrders() {
-      const orders = getUserOrders();
+    async function renderOrders() {
+      const orders = await getUserOrders();
       if (orders.length === 0) {
-        container.innerHTML = '<div class="feature-card" style="padding:2rem;text-align:center;">No orders found</div>';
+        container.innerHTML = '<div class="feature-card" style="padding:2rem;text-align:center;">No orders found. Start shopping to place your first order!</div>';
         return;
       }
 
       container.innerHTML = orders.map(o => {
-        // Sanitize timeline (fix undefined / invalid)
+        // Sanitize timeline
         const timeline = (o.timeline || []).map(entry => {
-          const time = entry.time ? new Date(entry.time) : new Date();
-          const status = entry.status || o.status || 'update';
-          const note = entry.note || entry || '';
-          return { time, status, note };
+          if (typeof entry === 'string') {
+            return { time: new Date(), status: 'update', note: entry };
+          }
+          return {
+            time: entry.date ? new Date(entry.date) : new Date(),
+            status: entry.status || 'update',
+            note: entry.message || entry.note || ''
+          };
         });
 
         return `
@@ -168,11 +188,22 @@
             </div>
 
             <div class="timeline">
+              <h4 style="margin-bottom:0.5rem;">Order Timeline</h4>
               ${timeline.map(t => `
                 <div class="timeline-item">
                   <strong>${t.status}</strong>
                   <span>${t.time.toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })}</span>
                   <span>${t.note}</span>
+                </div>
+              `).join('')}
+            </div>
+
+            <div style="margin-top:1rem;">
+              <h4>Order Items:</h4>
+              ${o.items.map(item => `
+                <div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+                  <span>${item.name} x ${item.quantity}</span>
+                  <span>R ${(item.price * item.quantity).toFixed(2)}</span>
                 </div>
               `).join('')}
             </div>

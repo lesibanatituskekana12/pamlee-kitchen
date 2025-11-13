@@ -1,32 +1,67 @@
 // Main JavaScript for UI interactions
 
+// Navbar scroll effect
+let lastScroll = 0;
+const navbar = document.querySelector('.navbar');
+
+window.addEventListener('scroll', () => {
+    const currentScroll = window.pageYOffset;
+    
+    // Add scrolled class when scrolled down
+    if (currentScroll > 50) {
+        navbar.classList.add('scrolled');
+    } else {
+        navbar.classList.remove('scrolled');
+    }
+    
+    lastScroll = currentScroll;
+});
+
 // Mobile menu toggle
 document.addEventListener('DOMContentLoaded', () => {
     const menuToggle = document.getElementById('menuToggle');
     const mobileNav = document.getElementById('mobileNav');
     
+    // Create overlay element
+    const overlay = document.createElement('div');
+    overlay.className = 'mobile-nav-overlay';
+    document.body.appendChild(overlay);
+    
+    function closeMobileMenu() {
+        mobileNav.classList.remove('active');
+        menuToggle.classList.remove('active');
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+        const icon = menuToggle.querySelector('svg');
+        icon.innerHTML = '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>';
+    }
+    
+    function openMobileMenu() {
+        mobileNav.classList.add('active');
+        menuToggle.classList.add('active');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        const icon = menuToggle.querySelector('svg');
+        icon.innerHTML = '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>';
+    }
+    
     if (menuToggle && mobileNav) {
         menuToggle.addEventListener('click', () => {
-            mobileNav.classList.toggle('active');
-            
-            // Update icon
-            const icon = menuToggle.querySelector('svg');
             if (mobileNav.classList.contains('active')) {
-                icon.innerHTML = '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>';
+                closeMobileMenu();
             } else {
-                icon.innerHTML = '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>';
+                openMobileMenu();
             }
         });
         
         // Close mobile menu when clicking a link
         const mobileLinks = mobileNav.querySelectorAll('.nav-link');
         mobileLinks.forEach(link => {
-            link.addEventListener('click', () => {
-                mobileNav.classList.remove('active');
-                const icon = menuToggle.querySelector('svg');
-                icon.innerHTML = '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>';
-            });
+            link.addEventListener('click', closeMobileMenu);
         });
+        
+        // Close mobile menu when clicking overlay
+        overlay.addEventListener('click', closeMobileMenu);
     }
     
     // Add fade-in animations on scroll

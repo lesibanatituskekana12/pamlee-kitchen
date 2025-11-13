@@ -63,12 +63,22 @@ function updateCartUI() {
     const cartCount = document.getElementById('cartCount');
     const cartItems = document.getElementById('cartItems');
     const cartTotal = document.getElementById('cartTotal');
+    const cartBtn = document.getElementById('cartBtn');
 
     // Update cart count badge
     const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
     if (cartCount) {
+        const oldCount = parseInt(cartCount.textContent) || 0;
         cartCount.textContent = totalItems;
         cartCount.style.display = totalItems > 0 ? 'flex' : 'none';
+        
+        // Trigger bounce animation when items are added
+        if (totalItems > oldCount && cartBtn) {
+            cartBtn.classList.remove('bounce');
+            void cartBtn.offsetWidth; // Trigger reflow
+            cartBtn.classList.add('bounce');
+            setTimeout(() => cartBtn.classList.remove('bounce'), 500);
+        }
     }
 
     // Update cart items display
@@ -186,7 +196,7 @@ function checkout() {
 }
 
 // Process checkout and save order
-function processCheckout(paymentMethod, fulfilment) {
+async function processCheckout(paymentMethod, fulfilment) {
     const cart = getCart();
     const subtotal = getCartTotal();
     const deliveryFee = fulfilment === 'delivery' ? 40 : 0;
@@ -208,16 +218,26 @@ function processCheckout(paymentMethod, fulfilment) {
         placedAt: Date.now()
     };
 
-    // Save and broadcast
-    createOrder(order);
+    try {
+        // Save to backend if API is available
+        if (window.OrdersAPI) {
+            await OrdersAPI.create(order);
+        } else {
+            // Fallback to localStorage
+            createOrder(order);
+        }
 
-    // Clear cart
-    localStorage.removeItem('cart');
-    updateCartUI();
-    closeCartModal();
+        // Clear cart
+        localStorage.removeItem('cart');
+        updateCartUI();
+        closeCartModal();
 
-    // Notify user
-    alert(`✅ Order placed successfully!\n\nTracker ID: ${order.trackerId}\nTotal: R ${order.total.toFixed(2)}\n\nKeep this tracker ID to track your order.`);
+        // Notify user
+        alert(`✅ Order placed successfully!\n\nTracker ID: ${order.trackerId}\nTotal: R ${order.total.toFixed(2)}\n\nKeep this tracker ID to track your order.`);
+    } catch (error) {
+        alert('Failed to place order. Please try again.');
+        console.error('Order error:', error);
+    }
 }
 
 // ============================

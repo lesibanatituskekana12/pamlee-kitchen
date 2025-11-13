@@ -35,7 +35,28 @@
         <p>Manage live customer orders in real-time</p>
       </div>
 
+      <!-- Stats Cards -->
+      <div id="statsContainer" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-top:2rem;">
+        <div class="feature-card" style="padding:1.5rem;text-align:center;">
+          <h3 style="margin:0;color:var(--secondary);" id="totalOrders">-</h3>
+          <p style="margin:0.5rem 0 0;color:var(--muted-foreground);">Total Orders</p>
+        </div>
+        <div class="feature-card" style="padding:1.5rem;text-align:center;">
+          <h3 style="margin:0;color:var(--secondary);" id="totalRevenue">R 0</h3>
+          <p style="margin:0.5rem 0 0;color:var(--muted-foreground);">Total Revenue</p>
+        </div>
+        <div class="feature-card" style="padding:1.5rem;text-align:center;">
+          <h3 style="margin:0;color:var(--secondary);" id="pendingOrders">-</h3>
+          <p style="margin:0.5rem 0 0;color:var(--muted-foreground);">Pending Orders</p>
+        </div>
+        <div class="feature-card" style="padding:1.5rem;text-align:center;">
+          <h3 style="margin:0;color:var(--secondary);" id="totalProducts">-</h3>
+          <p style="margin:0.5rem 0 0;color:var(--muted-foreground);">Total Products</p>
+        </div>
+      </div>
+
       <div id="ordersContainer" class="fade-in" style="margin-top:2rem;">
+        <h2 style="margin-bottom:1rem;">Recent Orders</h2>
         <div class="feature-card" style="padding:1.5rem;text-align:center;">
           <p>Loading orders...</p>
         </div>
@@ -71,12 +92,13 @@
   </footer>
 
   <!-- Admin Script -->
+  <script src="api.js"></script>
   <script>
     // =============================
     // 🔐 Session Check
     // =============================
-    const admin = JSON.parse(localStorage.getItem('pamlee_admin') || 'null');
-    if (!admin) {
+    const user = JSON.parse(localStorage.getItem('pamlee_user') || 'null');
+    if (!user || user.role !== 'admin') {
       alert('Please sign in as admin first.');
       window.location.href = 'login.html';
     }
@@ -85,9 +107,13 @@
     // 🚪 Logout Handler
     // =============================
     document.getElementById('logoutBtn').addEventListener('click', () => {
-      localStorage.removeItem('pamlee_admin');
-      alert('You have been signed out.');
-      window.location.href = 'login.html';
+      if (window.AuthAPI) {
+        AuthAPI.logout();
+      } else {
+        localStorage.removeItem('pamlee_user');
+        alert('You have been signed out.');
+        window.location.href = 'login.html';
+      }
     });
 
     // =============================
@@ -137,76 +163,100 @@
     // =============================
     // 📦 Render Orders
     // =============================
-    function renderOrders() {
+    async function renderOrders() {
       const container = document.getElementById('ordersContainer');
-      const orders = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
-      if (orders.length === 0) {
-        container.innerHTML = '<div class="feature-card" style="padding:2rem;text-align:center;">No orders yet</div>';
-        return;
-      }
+      
+      try {
+        let orders = [];
+        if (window.OrdersAPI) {
+          const data = await OrdersAPI.getAll();
+          orders = data.orders || [];
+        } else {
+          orders = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
+        }
 
-      container.innerHTML = orders.map(order => `
-        <div class="feature-card" style="margin-bottom:1rem;padding:1rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <strong>${order.trackerId}</strong> <br>
-              <small>${order.userEmail}</small><br>
-              <small>Placed: ${new Date(order.placedAt).toLocaleString()}</small>
-            </div>
-            <div>
-              <strong>R ${order.total.toFixed(2)}</strong><br>
-              <span style="font-size:0.9rem;color:gray;">${order.paymentMethod} / ${order.fulfilment}</span>
-            </div>
-          </div>
-          <div style="margin-top:1rem;">
-            <label>Status:</label>
-            <select data-id="${order.trackerId}" style="padding:0.3rem 0.5rem;border-radius:6px;margin-right:0.5rem;">
-              ${['placed','preparing','ready','out-for-delivery','picked-up','delivered']
-                .map(status => `<option ${status===order.status?'selected':''}>${status}</option>`).join('')}
-            </select>
-            <button class="btn btn-gold btn-sm" data-update="${order.trackerId}">Update</button>
-          </div>
-          <div style="margin-top:0.5rem;color:var(--muted-foreground);font-size:0.9rem;">
-            Items: ${order.items.map(i => `${i.name} x${i.quantity}`).join(', ')}
-          </div>
-        </div>
-      `).join('');
+        if (orders.length === 0) {
+          container.innerHTML = '<div class="feature-card" style="padding:2rem;text-align:center;">No orders yet</div>';
+          return;
+        }
 
-      document.querySelectorAll('[data-update]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.getAttribute('data-update');
-          const status = document.querySelector(`select[data-id="${id}"]`).value;
-          updateOrderStatus(id, status);
+        container.innerHTML = orders.map(order => `
+          <div class="feature-card" style="margin-bottom:1rem;padding:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <strong>${order.trackerId}</strong> <br>
+                <small>${order.userEmail}</small><br>
+                <small>Placed: ${new Date(order.placedAt).toLocaleString()}</small>
+              </div>
+              <div>
+                <strong>R ${order.total.toFixed(2)}</strong><br>
+                <span style="font-size:0.9rem;color:gray;">${order.paymentMethod} / ${order.fulfilment}</span>
+              </div>
+            </div>
+            <div style="margin-top:1rem;">
+              <label>Status:</label>
+              <select data-id="${order.trackerId}" style="padding:0.3rem 0.5rem;border-radius:6px;margin-right:0.5rem;">
+                ${['placed','preparing','ready','out-for-delivery','picked-up','delivered']
+                  .map(status => `<option ${status===order.status?'selected':''}>${status}</option>`).join('')}
+              </select>
+              <button class="btn btn-gold btn-sm" data-update="${order.trackerId}">Update</button>
+            </div>
+            <div style="margin-top:0.5rem;color:var(--muted-foreground);font-size:0.9rem;">
+              Items: ${order.items.map(i => `${i.name} x${i.quantity}`).join(', ')}
+            </div>
+          </div>
+        `).join('');
+
+        document.querySelectorAll('[data-update]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-update');
+            const status = document.querySelector(`select[data-id="${id}"]`).value;
+            updateOrderStatus(id, status);
+          });
         });
-      });
+      } catch (error) {
+        console.error('Failed to load orders:', error);
+        container.innerHTML = '<div class="feature-card" style="padding:2rem;text-align:center;color:red;">Failed to load orders</div>';
+      }
     }
 
     // =============================
-    // 🔄 Update Order Status (Fixed)
+    // 🔄 Update Order Status
     // =============================
-    function updateOrderStatus(trackerId, status) {
-      const orders = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
-      const idx = orders.findIndex(o => o.trackerId === trackerId);
-      if (idx === -1) return;
+    async function updateOrderStatus(trackerId, status) {
+      try {
+        if (window.OrdersAPI) {
+          await OrdersAPI.updateStatus(trackerId, status, `Order status changed to "${status}" by admin`);
+          showToast(`✅ Order ${trackerId} updated to ${status}`);
+          renderOrders();
+        } else {
+          // Fallback to localStorage
+          const orders = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
+          const idx = orders.findIndex(o => o.trackerId === trackerId);
+          if (idx === -1) return;
 
-      const order = orders[idx];
-      if (!order.timeline) order.timeline = [];
+          const order = orders[idx];
+          if (!order.timeline) order.timeline = [];
 
-      // Add timeline entry
-      order.timeline.push({
-        status,
-        time: new Date().toISOString(),
-        note: `Order status changed to "${status}" by admin`
-      });
+          order.timeline.push({
+            status,
+            time: new Date().toISOString(),
+            note: `Order status changed to "${status}" by admin`
+          });
 
-      order.status = status;
-      order.updatedAt = Date.now();
-      orders[idx] = order;
+          order.status = status;
+          order.updatedAt = Date.now();
+          orders[idx] = order;
 
-      localStorage.setItem('pamlee_orders', JSON.stringify(orders));
-      orderChannel.post({ type: 'update_order', trackerId, status });
-      showToast(`✅ Order ${trackerId} updated to ${status}`);
-      renderOrders();
+          localStorage.setItem('pamlee_orders', JSON.stringify(orders));
+          orderChannel.post({ type: 'update_order', trackerId, status });
+          showToast(`✅ Order ${trackerId} updated to ${status}`);
+          renderOrders();
+        }
+      } catch (error) {
+        console.error('Failed to update order:', error);
+        showToast('❌ Failed to update order');
+      }
     }
 
     // =============================
@@ -222,7 +272,36 @@
       }
     });
 
-    window.addEventListener('DOMContentLoaded', renderOrders);
+    // =============================
+    // 📊 Load Stats
+    // =============================
+    async function loadStats() {
+      try {
+        if (window.StatsAPI) {
+          const data = await StatsAPI.get();
+          const stats = data.stats;
+          document.getElementById('totalOrders').textContent = stats.totalOrders;
+          document.getElementById('totalRevenue').textContent = `R ${stats.totalRevenue.toFixed(2)}`;
+          document.getElementById('pendingOrders').textContent = stats.pendingOrders;
+          document.getElementById('totalProducts').textContent = stats.totalProducts;
+        } else {
+          // Fallback to localStorage
+          const orders = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
+          const products = JSON.parse(localStorage.getItem('products') || '[]');
+          document.getElementById('totalOrders').textContent = orders.length;
+          document.getElementById('totalRevenue').textContent = `R ${orders.reduce((sum, o) => sum + o.total, 0).toFixed(2)}`;
+          document.getElementById('pendingOrders').textContent = orders.filter(o => o.status === 'placed').length;
+          document.getElementById('totalProducts').textContent = products.length || 8;
+        }
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadStats();
+      renderOrders();
+    });
   </script>
 </body>
 </html>

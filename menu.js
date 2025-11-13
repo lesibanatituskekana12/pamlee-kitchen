@@ -1,96 +1,47 @@
 // Menu page - Products data and filtering
 
-const products = [
-    {
-        id: '1',
-        name: 'Chocolate Cake',
-        description: 'Rich chocolate layers with creamy frosting',
-        category: 'cakes',
-        price: 250,
-        image: '../src/assets/product-cake.jpg',
-        isPopular: true
-    },
-    {
-        id: '2',
-        name: 'Assorted Cupcakes',
-        description: '6 piece variety pack with different flavors',
-        category: 'cupcakes',
-        price: 120,
-        image: '../src/assets/product-cupcakes.jpg',
-        isPopular: true
-    },
-    {
-        id: '3',
-        name: 'French Pastries',
-        description: 'Buttery, flaky pastries fresh from the oven',
-        category: 'pastries',
-        price: 45,
-        image: '../src/assets/product-pastries.jpg',
-        isPopular: false
-    },
-    {
-        id: '4',
-        name: 'Artisan Bread',
-        description: 'Freshly baked sourdough with crispy crust',
-        category: 'bread',
-        price: 35,
-        image: '../src/assets/product-bread.jpg',
-        isPopular: false
-    },
-    {
-        id: '5',
-        name: 'Vanilla Cake',
-        description: 'Classic vanilla sponge with buttercream',
-        category: 'cakes',
-        price: 220,
-        image: '../src/assets/product-cake.jpg',
-        isPopular: false
-    },
-    {
-        id: '6',
-        name: 'Blueberry Muffins',
-        description: 'Moist muffins packed with fresh blueberries',
-        category: 'muffins',
-        price: 60,
-        image: '../src/assets/product-cupcakes.jpg',
-        isPopular: true
-    },
-    {
-        id: '7',
-        name: 'Croissants',
-        description: 'Light and buttery French croissants',
-        category: 'pastries',
-        price: 25,
-        image: '../src/assets/product-pastries.jpg',
-        isPopular: false
-    },
-    {
-        id: '8',
-        name: 'Whole Wheat Bread',
-        description: 'Healthy whole wheat loaf',
-        category: 'bread',
-        price: 30,
-        image: '../src/assets/product-bread.jpg',
-        isPopular: false
-    }
-];
-
+let products = [];
 let currentCategory = 'all';
 
-function renderProducts(category = 'all') {
+// Fetch products from backend
+async function loadProducts(category = 'all') {
+    try {
+        if (window.ProductsAPI) {
+            const data = await ProductsAPI.getAll(category);
+            products = data.products;
+        } else {
+            // Fallback to hardcoded products
+            products = [
+                { id: '1', name: 'Chocolate Cake', description: 'Rich chocolate layers with creamy frosting', category: 'cakes', price: 250, image: '../src/assets/product-cake.jpg', isPopular: true },
+                { id: '2', name: 'Assorted Cupcakes', description: '6 piece variety pack with different flavors', category: 'cupcakes', price: 120, image: '../src/assets/product-cupcakes.jpg', isPopular: true },
+                { id: '3', name: 'French Pastries', description: 'Buttery, flaky pastries fresh from the oven', category: 'pastries', price: 45, image: '../src/assets/product-pastries.jpg', isPopular: false },
+                { id: '4', name: 'Artisan Bread', description: 'Freshly baked sourdough with crispy crust', category: 'bread', price: 35, image: '../src/assets/product-bread.jpg', isPopular: false },
+                { id: '5', name: 'Vanilla Cake', description: 'Classic vanilla sponge with buttercream', category: 'cakes', price: 220, image: '../src/assets/product-cake.jpg', isPopular: false },
+                { id: '6', name: 'Blueberry Muffins', description: 'Moist muffins packed with fresh blueberries', category: 'muffins', price: 60, image: '../src/assets/product-cupcakes.jpg', isPopular: true },
+                { id: '7', name: 'Croissants', description: 'Light and buttery French croissants', category: 'pastries', price: 25, image: '../src/assets/product-pastries.jpg', isPopular: false },
+                { id: '8', name: 'Whole Wheat Bread', description: 'Healthy whole wheat loaf', category: 'bread', price: 30, image: '../src/assets/product-bread.jpg', isPopular: false }
+            ];
+            if (category !== 'all') {
+                products = products.filter(p => p.category === category);
+            }
+        }
+        renderProducts();
+    } catch (error) {
+        console.error('Failed to load products:', error);
+        renderProducts();
+    }
+}
+
+function renderProducts() {
     const grid = document.getElementById('productsGrid');
     if (!grid) return;
     
-    const filteredProducts = category === 'all' 
-        ? products 
-        : products.filter(p => p.category === category);
-    
-    if (filteredProducts.length === 0) {
+    if (products.length === 0) {
         grid.innerHTML = '<div class="cart-empty" style="grid-column: 1/-1; padding: 3rem;">No products found in this category</div>';
         return;
     }
     
-    grid.innerHTML = filteredProducts.map(product => `
+    grid.innerHTML = products.map(product => `
         <div class="product-card fade-in">
             <div class="product-image">
                 <img src="${product.image}" alt="${product.name}">
@@ -127,7 +78,7 @@ function renderProducts(category = 'all') {
 
 function filterCategory(category) {
     currentCategory = category;
-    renderProducts(category);
+    loadProducts(category);
     
     // Update active button
     document.querySelectorAll('.category-filters .btn').forEach(btn => {
@@ -141,5 +92,5 @@ function filterCategory(category) {
 
 // Initialize products on page load
 document.addEventListener('DOMContentLoaded', () => {
-    renderProducts();
+    loadProducts();
 });

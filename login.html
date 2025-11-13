@@ -169,6 +169,7 @@
 
   <!-- Script -->
   <script src="script.js"></script>
+  <script src="api.js"></script>
   <script>
     // Tab switching
     const customerTab = document.getElementById('customerTab');
@@ -204,58 +205,69 @@
     });
 
     // CUSTOMER SIGNUP
-    function customerSignup(e){
+    async function customerSignup(e){
       e.preventDefault();
       const email = document.getElementById('signupEmail').value.trim();
       const password = document.getElementById('signupPassword').value.trim();
-      const users = JSON.parse(localStorage.getItem('pamlee_users') || '[]');
-      if (users.find(u => u.email === email)) {
-        alert('Account already exists.');
-        return;
+      
+      try {
+        const data = await AuthAPI.signup(email, password);
+        alert('Account created! Redirecting...');
+        window.location.href = 'index.html';
+      } catch (error) {
+        alert(error.message || 'Signup failed. Please try again.');
       }
-      users.push({email, password});
-      localStorage.setItem('pamlee_users', JSON.stringify(users));
-      localStorage.setItem('pamlee_user', JSON.stringify({email}));
-      alert('Account created! Redirecting...');
-      window.location.href = 'index.html';
     }
 
     // CUSTOMER SIGNIN
-    function customerSignin(e){
+    async function customerSignin(e){
       e.preventDefault();
       const email = document.getElementById('signinEmail').value.trim();
       const password = document.getElementById('signinPassword').value.trim();
-      const users = JSON.parse(localStorage.getItem('pamlee_users') || '[]');
-      const user = users.find(u => u.email === email && u.password === password);
-      if (!user) {
-        alert('Invalid email or password.');
-        return;
+      
+      try {
+        const data = await AuthAPI.login(email, password);
+        if (data.user.role === 'admin') {
+          alert('Welcome Admin! Redirecting...');
+          window.location.href = 'admin.html';
+        } else {
+          alert('Welcome back! Redirecting...');
+          window.location.href = 'index.html';
+        }
+      } catch (error) {
+        alert(error.message || 'Invalid email or password.');
       }
-      localStorage.setItem('pamlee_user', JSON.stringify(user));
-      alert('Welcome back! Redirecting...');
-      window.location.href = 'index.html';
     }
 
     // ADMIN SIGNIN
-    function adminSignin(e){
+    async function adminSignin(e){
       e.preventDefault();
       const username = document.getElementById('adminUsername').value.trim();
       const password = document.getElementById('adminPassword').value.trim();
-      if (username === 'pamleeadmin' && password === 'password123') {
-        localStorage.setItem('pamlee_admin', JSON.stringify({username}));
-        alert('Welcome Admin! Redirecting...');
-        window.location.href = 'admin.html';
-      } else {
+      
+      try {
+        const data = await AuthAPI.login(username, password);
+        if (data.user.role === 'admin') {
+          alert('Welcome Admin! Redirecting...');
+          window.location.href = 'admin.html';
+        } else {
+          alert('Invalid admin credentials.');
+        }
+      } catch (error) {
         alert('Invalid admin credentials.');
       }
     }
 
     // Optional: auto redirect if already logged in
     window.addEventListener('DOMContentLoaded', ()=>{
-      const admin = JSON.parse(localStorage.getItem('pamlee_admin'));
-      const user = JSON.parse(localStorage.getItem('pamlee_user'));
-      if (admin) window.location.href = 'admin.html';
-      else if (user) window.location.href = 'index.html';
+      const user = JSON.parse(localStorage.getItem('pamlee_user') || 'null');
+      if (user) {
+        if (user.role === 'admin') {
+          window.location.href = 'admin.html';
+        } else {
+          window.location.href = 'index.html';
+        }
+      }
     });
   </script>
 </body>
