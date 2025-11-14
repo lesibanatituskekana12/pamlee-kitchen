@@ -76,9 +76,8 @@
     </div>
   </footer>
 
-  <script type="module">
-    import { listenOrders, notify } from './orders.js';
-
+  <script src="api.js"></script>
+  <script>
     const form = document.getElementById('trackForm');
     const trackerInput = document.getElementById('trackerInput');
     const trackResult = document.getElementById('trackResult');
@@ -91,8 +90,20 @@
         trackResult.innerHTML = `<p style="color:var(--muted-foreground);">Order not found. Please check your tracker ID.</p>`;
         return;
       }
-      const placed = new Date(order.placedAt).toLocaleString();
+      const placed = order.placedAt ? new Date(order.placedAt).toLocaleString() : 'N/A';
       const updated = order.updatedAt ? new Date(order.updatedAt).toLocaleString() : placed;
+      
+      // Build timeline if available
+      let timelineHTML = '';
+      if (order.timeline && order.timeline.length > 0) {
+        timelineHTML = `
+          <p><strong>Timeline:</strong></p>
+          <ul style="margin-left:1rem;">
+            ${order.timeline.map(t => `<li>${t.date}: ${t.message || t.status}</li>`).join('')}
+          </ul>
+        `;
+      }
+      
       trackResult.innerHTML = `
         <div style="text-align:left;">
           <h3>Order: ${order.trackerId}</h3>
@@ -105,32 +116,50 @@
             ${order.items.map(i => `<li>${i.name} x${i.quantity}</li>`).join('')}
           </ul>
           <p><strong>Method:</strong> ${order.paymentMethod} | ${order.fulfilment}</p>
+          ${timelineHTML}
         </div>
       `;
     }
 
     // Handle form submit
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const id = trackerInput.value.trim();
       if (!id) return;
       currentTracker = id;
 
-      const orders = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
-      const order = orders.find(o => o.trackerId === id);
-      renderOrder(order);
-    });
+      trackResult.innerHTML = `<p style="color:var(--muted-foreground);">Loading...</p>`;
 
-    // Listen for live updates
-    listenOrders(data => {
-      if (!currentTracker) return;
-      if (data.type === 'update_order' && data.trackerId === currentTracker) {
+      try {
+        // Try to fetch from backend API
+        const data = await OrdersAPI.getByTrackerId(id);
+        if (data.success && data.order) {
+          renderOrder(data.order);
+        } else {
+          renderOrder(null);
+        }
+      } catch (error) {
+        console.error('Error fetching order:', error);
+        // Fallback to localStorage
         const orders = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
-        const order = orders.find(o => o.trackerId === currentTracker);
+        const order = orders.find(o => o.trackerId === id);
         renderOrder(order);
-        notify(`Your order (${currentTracker}) is now ${data.status}`);
       }
     });
+
+    // Poll for updates every 10 seconds if tracking an order
+    setInterval(async () => {
+      if (!currentTracker) return;
+      
+      try {
+        const data = await OrdersAPI.getByTrackerId(currentTracker);
+        if (data.success && data.order) {
+          renderOrder(data.order);
+        }
+      } catch (error) {
+        console.error('Error polling order:', error);
+      }
+    }, 10000);
   </script>
 </body>
 </html>

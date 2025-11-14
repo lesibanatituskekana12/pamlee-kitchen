@@ -146,8 +146,8 @@ const orderChannel = (() => {
     }
 })();
 
-// Create order and notify admin
-function createOrder(order) {
+// Create order and notify admin (localStorage fallback only)
+function createOrderFallback(order) {
     const all = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
     all.unshift(order);
     localStorage.setItem('pamlee_orders', JSON.stringify(all));
@@ -656,8 +656,9 @@ async function processCheckout(paymentMethod, fulfilment, deliveryZone, delivery
     const user = JSON.parse(localStorage.getItem('pamlee_user'));
     const email = user ? user.email : 'guest@pamlee.co.za';
 
+    const trackerId = generateTrackerId();
     const order = {
-        trackerId: generateTrackerId(),
+        trackerId,
         userEmail: email,
         items: cart,
         subtotal,
@@ -673,22 +674,28 @@ async function processCheckout(paymentMethod, fulfilment, deliveryZone, delivery
 
     try {
         // Save to backend via API
-        const response = await fetch('/api/orders', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(order)
-        });
+        if (window.OrdersAPI) {
+            const data = await OrdersAPI.create(order);
+            console.log('Order created via API:', data);
+        } else {
+            // Fallback to direct fetch
+            const response = await fetch('/api/orders', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(order)
+            });
 
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to place order');
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to place order');
+            }
         }
 
-        // Also save to localStorage for fallback
-        createOrder(order);
+        // Also save to localStorage for real-time updates
+        createOrderFallback(order);
 
         // Clear cart
         localStorage.removeItem('cart');
@@ -701,12 +708,13 @@ async function processCheckout(paymentMethod, fulfilment, deliveryZone, delivery
         console.error('Order error:', error);
         
         // Fallback: save to localStorage only
-        createOrder(order);
+        createOrderFallback(order);
         localStorage.removeItem('cart');
         updateCartUI();
         closeCartModal();
         
         showOrderSuccessModal(order);
+        showNotification('⚠️ Order saved locally. Please check your connection.');
     }
 }
 
