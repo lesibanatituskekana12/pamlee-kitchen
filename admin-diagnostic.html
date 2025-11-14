@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard Diagnostic - Pam_Lee's Kitchen</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .diagnostic-container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 2rem;
+    }
+    .diagnostic-header {
+      text-align: center;
+      margin-bottom: 2rem;
+      padding: 2rem;
+      background: linear-gradient(135deg, var(--secondary), var(--primary));
+      border-radius: 12px;
+      color: white;
+    }
+    .diagnostic-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .diagnostic-section h2 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      color: var(--secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .section-icon {
+      font-size: 1.5rem;
+    }
+    .test-item {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      background: var(--background);
+      border-radius: 4px;
+      border-left: 4px solid transparent;
+      transition: all 0.3s ease;
+    }
+    .test-item.success {
+      border-left-color: #10b981;
+      background: rgba(16, 185, 129, 0.05);
+    }
+    .test-item.error {
+      border-left-color: #ef4444;
+      background: rgba(239, 68, 68, 0.05);
+    }
+    .test-item.warning {
+      border-left-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.05);
+    }
+    .test-item.running {
+      border-left-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.05);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .test-icon {
+      margin-right: 0.75rem;
+      font-size: 1.25rem;
+    }
+    .test-content {
+      flex: 1;
+    }
+    .test-details {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+      margin-top: 0.25rem;
+    }
+    .test-time {
+      font-size: 0.75rem;
+      color: var(--muted-foreground);
+      margin-left: auto;
+    }
+    .login-form {
+      display: grid;
+      gap: 1rem;
+      max-width: 400px;
+      margin: 1rem 0;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .form-group label {
+      font-weight: 500;
+      color: var(--foreground);
+    }
+    .form-group input {
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--background);
+      color: var(--foreground);
+    }
+    .btn-test {
+      margin-top: 1rem;
+    }
+    .summary-card {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .summary-item {
+      padding: 1rem;
+      background: var(--background);
+      border-radius: 8px;
+      text-align: center;
+    }
+    .summary-value {
+      font-size: 2rem;
+      font-weight: bold;
+      margin: 0.5rem 0;
+    }
+    .summary-label {
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+    }
+    .success-rate {
+      font-size: 3rem;
+      font-weight: bold;
+      background: linear-gradient(135deg, var(--secondary), var(--primary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+  </style>
+</head>
+<body>
+  <header class="navbar">
+    <div class="navbar-content">
+      <a href="index.html" class="navbar-brand">
+        <span class="brand-name">Pam_Lee's Kitchen</span>
+      </a>
+      <nav class="nav-links desktop-nav">
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="admin.html" class="nav-link">Admin Dashboard</a>
+        <a href="diagnostic.html" class="nav-link">System Diagnostic</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="diagnostic-container">
+    <div class="diagnostic-header">
+      <h1>🔧 Admin Dashboard Diagnostic</h1>
+      <p>Comprehensive testing for admin functionality</p>
+    </div>
+
+    <!-- Login Section -->
+    <div class="diagnostic-section">
+      <h2><span class="section-icon">🔐</span> Admin Credentials</h2>
+      <div class="login-form">
+        <div class="form-group">
+          <label for="adminEmail">Admin Email</label>
+          <input type="email" id="adminEmail" value="admin@pamlee.co.za" placeholder="admin@pamlee.co.za">
+        </div>
+        <div class="form-group">
+          <label for="adminPassword">Admin Password</label>
+          <input type="password" id="adminPassword" value="admin123" placeholder="Enter password">
+        </div>
+      </div>
+      <button class="btn btn-gold btn-test" onclick="runAllTests()">🚀 Run Admin Diagnostics</button>
+    </div>
+
+    <!-- Summary -->
+    <div class="diagnostic-section" id="summarySection" style="display: none;">
+      <h2><span class="section-icon">📊</span> Test Summary</h2>
+      <div class="summary-card">
+        <div class="summary-item">
+          <div class="summary-label">Success Rate</div>
+          <div class="success-rate" id="successRate">0%</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Passed</div>
+          <div class="summary-value" style="color: #10b981;" id="passedCount">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Failed</div>
+          <div class="summary-value" style="color: #ef4444;" id="failedCount">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Warnings</div>
+          <div class="summary-value" style="color: #f59e0b;" id="warningCount">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test Results -->
+    <div class="diagnostic-section">
+      <h2><span class="section-icon">🔍</span> Test Results</h2>
+      <div id="testResults"></div>
+    </div>
+  </main>
+
+  <script src="api.js"></script>
+  <script>
+    const testResults = {
+      passed: 0,
+      failed: 0,
+      warnings: 0,
+      tests: []
+    };
+
+    let adminToken = null;
+
+    function addTest(name, status, details = '', time = '') {
+      const icon = status === 'success' ? '✅' : 
+                   status === 'error' ? '❌' : 
+                   status === 'warning' ? '⚠️' : '⏳';
+      
+      testResults.tests.push({ name, status, details, icon, time });
+      renderTests();
+      
+      if (status === 'success') testResults.passed++;
+      if (status === 'error') testResults.failed++;
+      if (status === 'warning') testResults.warnings++;
+      
+      updateSummary();
+    }
+
+    function renderTests() {
+      const container = document.getElementById('testResults');
+      
+      if (testResults.tests.length === 0) {
+        container.innerHTML = '<p style="color: var(--muted-foreground); text-align: center; padding: 2rem;">Click "Run Admin Diagnostics" to start testing</p>';
+        return;
+      }
+
+      container.innerHTML = testResults.tests.map(test => `
+        <div class="test-item ${test.status}">
+          <span class="test-icon">${test.icon}</span>
+          <div class="test-content">
+            <strong>${test.name}</strong>
+            ${test.details ? `<div class="test-details">${test.details}</div>` : ''}
+          </div>
+          ${test.time ? `<span class="test-time">${test.time}</span>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function updateSummary() {
+      document.getElementById('summarySection').style.display = 'block';
+      
+      const total = testResults.passed + testResults.failed;
+      const rate = total > 0 ? ((testResults.passed / total) * 100).toFixed(1) : 0;
+      
+      document.getElementById('successRate').textContent = rate + '%';
+      document.getElementById('passedCount').textContent = testResults.passed;
+      document.getElementById('failedCount').textContent = testResults.failed;
+      document.getElementById('warningCount').textContent = testResults.warnings;
+    }
+
+    async function runAllTests() {
+      // Reset
+      testResults.passed = 0;
+      testResults.failed = 0;
+      testResults.warnings = 0;
+      testResults.tests = [];
+      adminToken = null;
+      
+      renderTests();
+      document.getElementById('summarySection').style.display = 'none';
+
+      const email = document.getElementById('adminEmail').value;
+      const password = document.getElementById('adminPassword').value;
+
+      // Test 1: Admin Login
+      await testAdminLogin(email, password);
+      
+      // Test 2: Admin Stats
+      await testAdminStats();
+      
+      // Test 3: Get All Orders
+      const orders = await testGetAllOrders();
+      
+      // Test 4: Update Order Status
+      await testUpdateOrderStatus(orders);
+      
+      // Test 5: Get Products
+      const products = await testGetProducts();
+      
+      // Test 6: Create Product
+      await testCreateProduct();
+      
+      // Test 7: Update Product
+      await testUpdateProduct(products);
+      
+      // Test 8: Delete Product
+      await testDeleteProduct();
+      
+      // Test 9: Non-Admin Prevention
+      await testNonAdminPrevention();
+    }
+
+    async function testAdminLogin(email, password) {
+      const startTime = Date.now();
+      addTest('Admin Login', 'running', 'Authenticating...');
+      
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        const time = `${Date.now() - startTime}ms`;
+        
+        if (response.ok && data.success && data.user.role === 'admin') {
+          adminToken = data.token;
+          testResults.tests.pop();
+          addTest('Admin Login', 'success', `Logged in as ${data.user.email}`, time);
+        } else {
+          testResults.tests.pop();
+          addTest('Admin Login', 'error', data.error || 'Login failed or not admin', time);
+        }
+      } catch (error) {
+        testResults.tests.pop();
+        addTest('Admin Login', 'error', error.message);
+      }
+    }
+
+    async function testAdminStats() {
+      if (!adminToken) {
+        addTest('Admin Stats', 'warning', 'Skipped - No admin token');
+        return;
+      }
+      
+      const startTime = Date.now();
+      addTest('Admin Stats', 'running', 'Fetching statistics...');
+      
+      try {
+        const response = await fetch('/api/stats', {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        
+        const data = await response.json();
+        const time = `${Date.now() - startTime}ms`;
+        
+        if (response.ok && data.success) {
+          testResults.tests.pop();
+          addTest('Admin Stats', 'success', 
+            `Orders: ${data.stats.totalOrders}, Revenue: R${data.stats.totalRevenue}, Products: ${data.stats.totalProducts}`, 
+            time);
+        } else {
+          testResults.tests.pop();
+          addTest('Admin Stats', 'error', data.error || 'Failed to fetch stats', time);
+        }
+      } catch (error) {
+        testResults.tests.pop();
+        addTest('Admin Stats', 'error', error.message);
+      }
+    }
+
+    async function testGetAllOrders() {
+      if (!adminToken) {
+        addTest('Get All Orders', 'warning', 'Skipped - No admin token');
+        return [];
+      }
+      
+      const startTime = Date.now();
+      addTest('Get All Orders', 'running', 'Fetching orders...');
+      
+      try {
+        const response = await fetch('/api/orders', {
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        
+        const data = await response.json();
+        const time = `${Date.now() - startTime}ms`;
+        
+        if (response.ok && data.success) {
+          testResults.tests.pop();
+          addTest('Get All Orders', 'success', `Retrieved ${data.orders.length} orders`, time);
+          return data.orders;
+        } else {
+          testResults.tests.pop();
+          addTest('Get All Orders', 'error', data.error || 'Failed to fetch orders', time);
+          return [];
+        }
+      } catch (error) {
+        testResults.tests.pop();
+        addTest('Get All Orders', 'error', error.message);
+        return [];
+      }
+    }
+
+    async function testUpdateOrderStatus(orders) {
+      if (!adminToken) {
+        addTest('Update Order Status', 'warning', 'Skipped - No admin token');
+        return;
+      }
+      
+      if (!orders || orders.length === 0) {
+        addTest('Update Order Status', 'warning', 'Skipped - No orders available');
+        return;
+      }
+      
+      const startTime = Date.now();
+      addTest('Update Order Status', 'running', 'Updating order...');
+      
+      try {
+        const order = orders[0];
+        const newStatus = order.status === 'placed' ? 'preparing' : 'placed';
+        
+        const response = await fetch(`/api/orders/${order.trackerId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status: newStatus,
+            note: 'Diagnostic test'
+          })
+        });
+        
+        const data = await response.json();
+        const time = `${Date.now() - startTime}ms`;
+        
+        if (response.ok && data.success) {
+          // Revert
+          await fetch(`/api/orders/${order.trackerId}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${adminToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              status: order.status,
+              note: 'Diagnostic test revert'
+            })
+          });
+          
+          testResults.tests.pop();
+          addTest('Update Order Status', 'success', `Updated ${order.trackerId} (reverted)`, time);
+        } else {
+          testResults.tests.pop();
+          addTest('Update Order Status', 'error', data.error || 'Failed to update order', time);
+        }
+      } catch (error) {
+        testResults.tests.pop();
+        addTest('Update Order Status', 'error', error.message);
+      }
+    }
+
+    async function testGetProducts() {
+      const startTime = Date.now();
+      addTest('Get Products', 'running', 'Fetching products...');
+      
+      try {
+        const response = await fetch('/api/products');
+        const data = await response.json();
+        const time = `${Date.now() - startTime}ms`;
+        
+        if (response.ok && data.success) {
+          testResults.tests.pop();
+          addTest('Get Products', 'success', `Retrieved ${data.products.length} products`, time);
+          return data.products;
+        } else {
+          testResults.tests.pop();
+          addTest('Get Products', 'error', data.error || 'Failed to fetch products', time);
+          return [];
+        }
+      } catch (error) {
+        testResults.tests.pop();
+        addTest('Get Products', 'error', error.message);
+        return [];
+      }
+    }
+
+    async function testCreateProduct() {
+      if (!adminToken) {
+        addTest('Create Product', 'warning', 'Skipped - No admin token');
+        return;
+      }
+      
+      const startTime = Date.now();
+      const testId = `TEST-${Date.now()}`;
+      addTest('Create Product', 'running', 'Creating test product...');
+      
+      try {
+        const response = await fetch('/api/products', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            id: testId,
+            name: 'Test Product',
+            description: 'Diagnostic test',
+            category: 'test',
+            price: 99.99,
+            image: 'test.jpg',
+            isPopular: false
+          })
+        });
+        
+        const data = await response.json();
+        const time = `${Date.now() - startTime}ms`;
+        
+        if (response.ok && data.success) {
+          // Clean up
+          await fetch(`/api/products/${testId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+          });
+          
+          testResults.tests.pop();
+          addTest('Create Product', 'success', `Created and deleted ${testId}`, time);
+        } else {
+          testResults.tests.pop();
+          addTest('Create Product', 'error', data.error || 'Failed to create product', time);
+        }
+      } catch (error) {
+        testResults.tests.pop();
+        addTest('Create Product', 'error', error.message);
+      }
+    }
+
+    async function testUpdateProduct(products) {
+      if (!adminToken) {
+        addTest('Update Product', 'warning', 'Skipped - No admin token');
+        return;
+      }
+      
+      if (!products || products.length === 0) {
+        addTest('Update Product', 'warning', 'Skipped - No products available');
+        return;
+      }
+      
+      const startTime = Date.now();
+      addTest('Update Product', 'running', 'Updating product...');
+      
+      try {
+        const product = products[0];
+        const newPrice = product.price + 10;
+        
+        const response = await fetch(`/api/products/${product.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            ...product,
+            price: newPrice
+          })
+        });
+        
+        const data = await response.json();
+        const time = `${Date.now() - startTime}ms`;
+        
+        if (response.ok && data.success) {
+          // Revert
+          await fetch(`/api/products/${product.id}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${adminToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(product)
+          });
+          
+          testResults.tests.pop();
+          addTest('Update Product', 'success', `Updated ${product.name} (reverted)`, time);
+        } else {
+          testResults.tests.pop();
+          addTest('Update Product', 'error', data.error || 'Failed to update product', time);
+        }
+      } catch (error) {
+        testResults.tests.pop();
+        addTest('Update Product', 'error', error.message);
+      }
+    }
+
+    async function testDeleteProduct() {
+      if (!adminToken) {
+        addTest('Delete Product', 'warning', 'Skipped - No admin token');
+        return;
+      }
+      
+      const startTime = Date.now();
+      const testId = `DELETE-${Date.now()}`;
+      addTest('Delete Product', 'running', 'Testing delete...');
+      
+      try {
+        // Create
+        await fetch('/api/products', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            id: testId,
+            name: 'Delete Test',
+            description: 'Will be deleted',
+            category: 'test',
+            price: 1,
+            image: 'test.jpg',
+            isPopular: false
+          })
+        });
+        
+        // Delete
+        const response = await fetch(`/api/products/${testId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+        
+        const data = await response.json();
+        const time = `${Date.now() - startTime}ms`;
+        
+        if (response.ok && data.success) {
+          testResults.tests.pop();
+          addTest('Delete Product', 'success', `Deleted ${testId}`, time);
+        } else {
+          testResults.tests.pop();
+          addTest('Delete Product', 'error', data.error || 'Failed to delete product', time);
+        }
+      } catch (error) {
+        testResults.tests.pop();
+        addTest('Delete Product', 'error', error.message);
+      }
+    }
+
+    async function testNonAdminPrevention() {
+      const startTime = Date.now();
+      addTest('Non-Admin Prevention', 'running', 'Testing security...');
+      
+      try {
+        // Create customer
+        const signupResponse = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: `customer${Date.now()}@test.com`,
+            password: 'testpass123',
+            name: 'Test Customer'
+          })
+        });
+        
+        const signupData = await signupResponse.json();
+        
+        if (!signupData.token) {
+          throw new Error('Failed to create test customer');
+        }
+        
+        // Try to access admin endpoint
+        const statsResponse = await fetch('/api/stats', {
+          headers: { 'Authorization': `Bearer ${signupData.token}` }
+        });
+        
+        const time = `${Date.now() - startTime}ms`;
+        
+        if (statsResponse.status === 403 || statsResponse.status === 401) {
+          testResults.tests.pop();
+          addTest('Non-Admin Prevention', 'success', 'Customer access properly blocked', time);
+        } else {
+          testResults.tests.pop();
+          addTest('Non-Admin Prevention', 'error', 'Security issue: Customer accessed admin endpoint', time);
+        }
+      } catch (error) {
+        testResults.tests.pop();
+        addTest('Non-Admin Prevention', 'error', error.message);
+      }
+    }
+
+    // Initialize
+    renderTests();
+  </script>
+</body>
+</html>
