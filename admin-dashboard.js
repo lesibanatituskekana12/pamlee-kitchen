@@ -346,10 +346,34 @@ function viewOrderDetails(trackerId) {
     });
 }
 
+// Toggle Health Widget
+function toggleHealthWidget() {
+    const widget = document.getElementById('adminHealthWidget');
+    const icon = document.getElementById('healthToggleIcon');
+    
+    if (widget.style.display === 'none') {
+        widget.style.display = 'block';
+        icon.textContent = '🔽';
+        
+        // Initialize widget if not already done
+        if (!window.adminHealth) {
+            window.adminHealth = new AdminHealthWidget('adminHealthWidget');
+            window.adminHealth.init();
+        } else {
+            // Refresh if already initialized
+            window.adminHealth.runQuickCheck();
+        }
+    } else {
+        widget.style.display = 'none';
+        icon.textContent = '🏥';
+    }
+}
+
 // Expose functions globally for onclick handlers
 window.updateOrderStatus = updateOrderStatus;
 window.filterOrders = filterOrders;
 window.viewOrderDetails = viewOrderDetails;
+window.toggleHealthWidget = toggleHealthWidget;
 
 // Show Order Details Modal
 function showOrderDetailsModal(order) {

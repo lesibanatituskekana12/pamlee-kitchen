@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Admin Dashboard</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 2rem;
+      background: #1a1a2e;
+      color: #fff;
+    }
+    .test-result {
+      padding: 1rem;
+      margin: 0.5rem 0;
+      border-radius: 4px;
+      background: #16213e;
+    }
+    .success { border-left: 4px solid #10b981; }
+    .error { border-left: 4px solid #ef4444; }
+    .info { border-left: 4px solid #3b82f6; }
+    pre {
+      background: #0f1419;
+      padding: 1rem;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 Admin Dashboard Test</h1>
+  <div id="results"></div>
+
+  <script>
+    const results = document.getElementById('results');
+
+    function addResult(type, title, message, data = null) {
+      const div = document.createElement('div');
+      div.className = `test-result ${type}`;
+      div.innerHTML = `
+        <strong>${title}</strong>
+        <p>${message}</p>
+        ${data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : ''}
+      `;
+      results.appendChild(div);
+    }
+
+    async function runTests() {
+      // Test 1: Check localStorage
+      addResult('info', 'Test 1: Check localStorage', 'Checking for user data...');
+      const user = JSON.parse(localStorage.getItem('pamlee_user') || 'null');
+      if (user) {
+        addResult('success', 'User found', `Email: ${user.email}, Role: ${user.role}`, user);
+      } else {
+        addResult('error', 'No user found', 'Please login first');
+        return;
+      }
+
+      // Test 2: Check API connection
+      addResult('info', 'Test 2: API Connection', 'Testing /api/health...');
+      try {
+        const healthRes = await fetch('/api/health');
+        const healthData = await healthRes.json();
+        addResult('success', 'API Connected', 'Health check passed', healthData);
+      } catch (error) {
+        addResult('error', 'API Failed', error.message);
+        return;
+      }
+
+      // Test 3: Fetch orders
+      addResult('info', 'Test 3: Fetch Orders', 'Getting orders from API...');
+      try {
+        const ordersRes = await fetch('/api/orders', {
+          headers: {
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+        const ordersData = await ordersRes.json();
+        
+        if (ordersData.success) {
+          addResult('success', 'Orders Retrieved', `Found ${ordersData.orders.length} orders`, {
+            count: ordersData.orders.length,
+            sample: ordersData.orders[0]
+          });
+          
+          // Test 4: Calculate stats
+          addResult('info', 'Test 4: Calculate Stats', 'Computing statistics...');
+          let revenue = 0;
+          ordersData.orders.forEach(order => {
+            const total = parseFloat(order.total) || 0;
+            revenue += total;
+            console.log(`Order ${order.trackerId}: total=${order.total}, parsed=${total}`);
+          });
+          
+          addResult('success', 'Stats Calculated', `Total Revenue: R${revenue.toFixed(2)}`, {
+            totalOrders: ordersData.orders.length,
+            revenue: revenue,
+            pending: ordersData.orders.filter(o => o.status === 'placed').length
+          });
+        } else {
+          addResult('error', 'Orders Failed', ordersData.error || 'Unknown error');
+        }
+      } catch (error) {
+        addResult('error', 'Orders Failed', error.message);
+      }
+
+      // Test 5: Check RealtimeOrders
+      addResult('info', 'Test 5: RealtimeOrders', 'Checking real-time system...');
+      if (window.RealtimeOrders) {
+        addResult('success', 'RealtimeOrders Loaded', 'Real-time system is available');
+        
+        // Test stats
+        const stats = window.RealtimeOrders.getStats();
+        addResult('info', 'RealtimeOrders Stats', 'Current stats from real-time system', stats);
+      } else {
+        addResult('error', 'RealtimeOrders Not Found', 'Real-time system not loaded');
+      }
+    }
+
+    // Run tests on load
+    window.addEventListener('DOMContentLoaded', runTests);
+  </script>
+  
+  <script src="realtime-orders.js"></script>
+</body>
+</html>

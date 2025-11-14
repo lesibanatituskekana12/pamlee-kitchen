@@ -55,10 +55,13 @@
       <div class="page-header fade-in">
         <h1>Admin <span class="text-gradient-gold">Dashboard</span></h1>
         <p>Manage live customer orders in real-time</p>
+        <button class="btn btn-outline" onclick="toggleHealthWidget()" style="margin-top:1rem;">
+          <span id="healthToggleIcon">🏥</span> System Health
+        </button>
       </div>
 
-      <!-- Health Widget -->
-      <div id="adminHealthWidget"></div>
+      <!-- Health Widget (Hidden by default) -->
+      <div id="adminHealthWidget" style="display:none;"></div>
 
       <!-- Stats Cards -->
       <div id="statsContainer" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-top:2rem;">

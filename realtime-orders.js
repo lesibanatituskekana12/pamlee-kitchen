@@ -56,7 +56,10 @@
         try {
             const user = JSON.parse(localStorage.getItem('pamlee_user'));
             
+            console.log('fetchOrders called:', { userRole, hasUser: !!user, userEmail: user?.email });
+            
             if (!user && userRole !== 'guest') {
+                console.warn('No user found in localStorage, using fallback');
                 // Fallback to localStorage for guest users
                 this.orders = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
                 this.notifyListeners(this.orders);
@@ -72,6 +75,7 @@
                 headers['Authorization'] = `Bearer ${token}`;
             }
 
+            console.log('Fetching orders from API...');
             const response = await fetch(`${API_BASE}/orders`, { headers });
             
             if (!response.ok) {
@@ -87,8 +91,12 @@
 
             const data = await response.json();
             
+            console.log('API response:', { success: data.success, orderCount: data.orders?.length });
+            
             if (data.success) {
                 this.orders = data.orders;
+                
+                console.log('Orders loaded:', this.orders.length);
                 
                 // Broadcast to other tabs
                 if (this.channel) {

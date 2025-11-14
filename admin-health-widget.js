@@ -484,22 +484,8 @@ class AdminHealthWidget {
   }
 }
 
-// Initialize global instance
+// Initialize global instance (but don't auto-init)
 let adminHealth;
 
-// Auto-initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    const container = document.getElementById('adminHealthWidget');
-    if (container) {
-      adminHealth = new AdminHealthWidget('adminHealthWidget');
-      adminHealth.init();
-    }
-  });
-} else {
-  const container = document.getElementById('adminHealthWidget');
-  if (container) {
-    adminHealth = new AdminHealthWidget('adminHealthWidget');
-    adminHealth.init();
-  }
-}
+// Make class available globally for manual initialization
+window.AdminHealthWidget = AdminHealthWidget;
