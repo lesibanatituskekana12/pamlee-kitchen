@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deployment Diagnostic Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            line-height: 1.6;
+        }
+        .test-result {
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .success {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+        .warning {
+            background: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+        .info {
+            background: #d1ecf1;
+            border-color: #17a2b8;
+            color: #0c5460;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Deployment Diagnostic Test</h1>
+    <p>This page will test your deployed app's backend connection.</p>
+    
+    <button onclick="runTests()">Run All Tests</button>
+    
+    <div id="results"></div>
+
+    <script>
+        async function runTests() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p class="loading">Running tests...</p>';
+            
+            const results = [];
+            
+            // Test 1: API Health
+            results.push(await testHealth());
+            
+            // Test 2: Products API
+            results.push(await testProducts());
+            
+            // Test 3: Login
+            results.push(await testLogin());
+            
+            // Test 4: Orders (with token from login)
+            const loginResult = results.find(r => r.name === 'Login Test');
+            if (loginResult && loginResult.token) {
+                results.push(await testOrders(loginResult.token));
+            }
+            
+            // Display results
+            displayResults(results);
+        }
+        
+        async function testHealth() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                
+                if (data.success && data.connected) {
+                    return {
+                        name: 'API Health Check',
+                        status: 'success',
+                        message: '✅ API is running and MongoDB is connected',
+                        details: data
+                    };
+                } else if (data.success && !data.connected) {
+                    return {
+                        name: 'API Health Check',
+                        status: 'error',
+                        message: '❌ API is running but MongoDB is NOT connected',
+                        details: data,
+                        fix: 'Environment variables (MONGO_URI) are missing or incorrect'
+                    };
+                } else {
+                    return {
+                        name: 'API Health Check',
+                        status: 'warning',
+                        message: '⚠️ API responded but status unclear',
+                        details: data
+                    };
+                }
+            } catch (error) {
+                return {
+                    name: 'API Health Check',
+                    status: 'error',
+                    message: '❌ Cannot connect to API',
+                    details: error.message,
+                    fix: 'Check if the backend server is running'
+                };
+            }
+        }
+        
+        async function testProducts() {
+            try {
+                const response = await fetch('/api/products');
+                const data = await response.json();
+                
+                if (data.success && data.products && data.products.length > 0) {
+                    return {
+                        name: 'Products API',
+                        status: 'success',
+                        message: `✅ Products loaded: ${data.products.length} products`,
+                        details: data.products.map(p => p.name).join(', ')
+                    };
+                } else if (data.success && data.products && data.products.length === 0) {
+                    return {
+                        name: 'Products API',
+                        status: 'warning',
+                        message: '⚠️ API works but no products in database',
+                        details: 'Database might not be seeded',
+                        fix: 'Products should be seeded automatically on first run'
+                    };
+                } else {
+                    return {
+                        name: 'Products API',
+                        status: 'error',
+                        message: '❌ Products API failed',
+                        details: data
+                    };
+                }
+            } catch (error) {
+                return {
+                    name: 'Products API',
+                    status: 'error',
+                    message: '❌ Cannot fetch products',
+                    details: error.message
+                };
+            }
+        }
+        
+        async function testLogin() {
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@pamlee.co.za',
+                        password: 'admin123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.token) {
+                    return {
+                        name: 'Login Test',
+                        status: 'success',
+                        message: '✅ Admin login successful',
+                        details: `User: ${data.user.email}, Role: ${data.user.role}`,
+                        token: data.token
+                    };
+                } else if (response.status === 503) {
+                    return {
+                        name: 'Login Test',
+                        status: 'error',
+                        message: '❌ Database connection issue',
+                        details: data.error || data.details,
+                        fix: 'MONGO_URI environment variable is missing or incorrect'
+                    };
+                } else {
+                    return {
+                        name: 'Login Test',
+                        status: 'error',
+                        message: '❌ Login failed',
+                        details: data.error || 'Unknown error'
+                    };
+                }
+            } catch (error) {
+                return {
+                    name: 'Login Test',
+                    status: 'error',
+                    message: '❌ Login request failed',
+                    details: error.message
+                };
+            }
+        }
+        
+        async function testOrders(token) {
+            try {
+                const response = await fetch('/api/orders', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.orders) {
+                    return {
+                        name: 'Orders API',
+                        status: 'success',
+                        message: `✅ Orders loaded: ${data.orders.length} orders`,
+                        details: data.orders.length > 0 
+                            ? `First order: ${data.orders[0].trackerId}` 
+                            : 'No orders in database yet'
+                    };
+                } else {
+                    return {
+                        name: 'Orders API',
+                        status: 'error',
+                        message: '❌ Orders API failed',
+                        details: data.error || 'Unknown error'
+                    };
+                }
+            } catch (error) {
+                return {
+                    name: 'Orders API',
+                    status: 'error',
+                    message: '❌ Cannot fetch orders',
+                    details: error.message
+                };
+            }
+        }
+        
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('results');
+            
+            const allSuccess = results.every(r => r.status === 'success');
+            const hasErrors = results.some(r => r.status === 'error');
+            
+            let html = '<h2>Test Results</h2>';
+            
+            if (allSuccess) {
+                html += '<div class="test-result success"><strong>🎉 All tests passed!</strong><br>Your deployment is working correctly.</div>';
+            } else if (hasErrors) {
+                html += '<div class="test-result error"><strong>❌ Some tests failed</strong><br>See details below for fixes.</div>';
+            }
+            
+            results.forEach(result => {
+                html += `
+                    <div class="test-result ${result.status}">
+                        <h3>${result.name}</h3>
+                        <p><strong>${result.message}</strong></p>
+                        ${result.details ? `<p>Details: ${typeof result.details === 'object' ? JSON.stringify(result.details, null, 2) : result.details}</p>` : ''}
+                        ${result.fix ? `<p><strong>Fix:</strong> ${result.fix}</p>` : ''}
+                    </div>
+                `;
+            });
+            
+            // Summary
+            html += '<h2>Summary</h2>';
+            html += '<div class="test-result info">';
+            html += `<p><strong>Total Tests:</strong> ${results.length}</p>`;
+            html += `<p><strong>Passed:</strong> ${results.filter(r => r.status === 'success').length}</p>`;
+            html += `<p><strong>Failed:</strong> ${results.filter(r => r.status === 'error').length}</p>`;
+            html += `<p><strong>Warnings:</strong> ${results.filter(r => r.status === 'warning').length}</p>`;
+            html += '</div>';
+            
+            // Next steps
+            if (hasErrors) {
+                html += '<h2>Next Steps</h2>';
+                html += '<div class="test-result warning">';
+                html += '<ol>';
+                html += '<li>Go to Vercel Dashboard → Your Project → Settings → Environment Variables</li>';
+                html += '<li>Verify these variables are set:<ul>';
+                html += '<li><code>MONGO_URI</code></li>';
+                html += '<li><code>JWT_SECRET</code></li>';
+                html += '<li><code>JWT_EXPIRES_IN</code></li>';
+                html += '<li><code>NODE_ENV</code></li>';
+                html += '</ul></li>';
+                html += '<li>If variables are set, try redeploying: Deployments → Latest → Redeploy</li>';
+                html += '<li>Wait 2-3 minutes and run this test again</li>';
+                html += '</ol>';
+                html += '<p><strong>See:</strong> <a href="https://github.com/lesibanatituskekana12/pamlee-kitchen/blob/main/URGENT_FIX_VERCEL.md" target="_blank">URGENT_FIX_VERCEL.md</a> for detailed instructions</p>';
+                html += '</div>';
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        // Auto-run on page load
+        window.addEventListener('load', () => {
+            setTimeout(runTests, 500);
+        });
+    </script>
+</body>
+</html>
