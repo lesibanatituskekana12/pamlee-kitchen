@@ -105,11 +105,15 @@
         const data = await response.json();
         console.log('Stats:', data);
         
-        if (data.success) {
-          document.getElementById('totalOrders').textContent = data.stats.totalOrders;
-          document.getElementById('totalRevenue').textContent = `R ${data.stats.totalRevenue.toFixed(2)}`;
-          document.getElementById('pendingOrders').textContent = data.stats.pendingOrders;
-          document.getElementById('totalProducts').textContent = data.stats.totalProducts;
+        if (data.success && data.stats) {
+          const stats = data.stats;
+          document.getElementById('totalOrders').textContent = stats.totalOrders || 0;
+          
+          const revenue = parseFloat(stats.totalRevenue) || 0;
+          document.getElementById('totalRevenue').textContent = `R ${revenue.toFixed(2)}`;
+          
+          document.getElementById('pendingOrders').textContent = stats.pendingOrders || 0;
+          document.getElementById('totalProducts').textContent = stats.totalProducts || 0;
         }
       } catch (error) {
         console.error('Error loading stats:', error);
@@ -150,40 +154,47 @@
         }
         
         // Render orders
-        container.innerHTML = orders.map(order => `
+        container.innerHTML = orders.map(order => {
+          const total = parseFloat(order.total) || 0;
+          const placedAt = order.placedAt ? new Date(order.placedAt).toLocaleString() : 'N/A';
+          const status = order.status || 'placed';
+          const trackerId = order.trackerId || 'Unknown';
+          
+          return `
           <div class="order-card">
             <div class="order-header">
               <div>
-                <div class="order-id">📝 ${order.trackerId}</div>
+                <div class="order-id">📝 ${trackerId}</div>
                 <div style="font-size:0.875rem;color:var(--muted-foreground);margin-top:0.25rem;">
-                  ${new Date(order.placedAt).toLocaleString()}
+                  ${placedAt}
                 </div>
               </div>
               <div>
                 <div style="font-size:1.25rem;font-weight:600;color:var(--secondary);">
-                  R ${order.total.toFixed(2)}
+                  R ${total.toFixed(2)}
                 </div>
-                <div class="order-status status-${order.status}">
-                  ${order.status.toUpperCase()}
+                <div class="order-status status-${status}">
+                  ${status.toUpperCase()}
                 </div>
               </div>
             </div>
             <div style="font-size:0.875rem;color:var(--muted-foreground);">
-              <div><strong>Customer:</strong> ${order.userEmail}</div>
-              <div><strong>Payment:</strong> ${order.paymentMethod.toUpperCase()}</div>
+              <div><strong>Customer:</strong> ${order.userEmail || 'N/A'}</div>
+              <div><strong>Payment:</strong> ${(order.paymentMethod || 'N/A').toUpperCase()}</div>
               <div><strong>Fulfillment:</strong> ${order.fulfilment === 'pickup' ? '🏪 Pickup' : '🚚 Delivery'}</div>
-              <div><strong>Items:</strong> ${order.items.length} item(s)</div>
+              <div><strong>Items:</strong> ${order.items?.length || 0} item(s)</div>
             </div>
             <div style="margin-top:1rem;">
-              <select onchange="updateOrderStatus('${order.trackerId}', this.value)" style="padding:0.5rem;border-radius:4px;border:1px solid var(--border);">
+              <select onchange="updateOrderStatus('${trackerId}', this.value)" style="padding:0.5rem;border-radius:4px;border:1px solid var(--border);">
                 <option value="">Change Status...</option>
-                <option value="preparing" ${order.status === 'preparing' ? 'selected' : ''}>Preparing</option>
-                <option value="ready" ${order.status === 'ready' ? 'selected' : ''}>Ready</option>
-                <option value="completed" ${order.status === 'completed' ? 'selected' : ''}>Completed</option>
+                <option value="preparing" ${status === 'preparing' ? 'selected' : ''}>Preparing</option>
+                <option value="ready" ${status === 'ready' ? 'selected' : ''}>Ready</option>
+                <option value="completed" ${status === 'completed' ? 'selected' : ''}>Completed</option>
               </select>
             </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
         
       } catch (error) {
         console.error('Error loading orders:', error);
