@@ -1,173 +1,69 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
-const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const connectDB = require('./config/database');
+const User = require('./models/User');
+const Product = require('./models/Product');
+const Order = require('./models/Order');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
-// Initialize SQLite database
-// Use in-memory database for Vercel, file-based for local
-let db;
-let dbPath;
-
-try {
-  dbPath = process.env.VERCEL ? ':memory:' : 'pamlee.db';
-  db = new Database(dbPath);
-  if (!process.env.VERCEL) {
-    db.pragma('journal_mode = WAL');
-  }
-  console.log(`✅ Database initialized: ${dbPath}`);
-} catch (error) {
-  console.error('❌ Database initialization failed:', error.message);
-  // Create mock database for Vercel if SQLite fails
-  if (process.env.VERCEL) {
-    console.log('⚠️ Using mock database for Vercel');
-    dbPath = 'mock';
-    db = null;
-  } else {
-    throw error;
-  }
-}
-
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static('.'));
 
-// ============================
-// Mock Data for Vercel (when SQLite fails)
-// ============================
-const MOCK_PRODUCTS = [
-  { id: '1', name: 'Chocolate Cake', description: 'Rich chocolate layers with creamy frosting', category: 'cakes', price: 250, image: 'src/assets/chocolate-cake.jpg', is_popular: 1 },
-  { id: '2', name: 'Vanilla Cupcakes', description: 'Light and fluffy vanilla cupcakes', category: 'cupcakes', price: 35, image: 'src/assets/vanilla-cupcakes.jpg', is_popular: 1 },
-  { id: '3', name: 'Sourdough Bread', description: 'Artisan sourdough with crispy crust', category: 'bread', price: 45, image: 'src/assets/sourdough.jpg', is_popular: 0 },
-  { id: '4', name: 'Croissants', description: 'Buttery, flaky French pastries', category: 'pastries', price: 25, image: 'src/assets/croissants.jpg', is_popular: 1 },
-  { id: '5', name: 'Blueberry Muffins', description: 'Fresh blueberries in every bite', category: 'muffins', price: 30, image: 'src/assets/blueberry-muffins.jpg', is_popular: 0 },
-  { id: '6', name: 'Red Velvet Cake', description: 'Classic red velvet with cream cheese frosting', category: 'cakes', price: 280, image: 'src/assets/red-velvet.jpg', is_popular: 1 },
-  { id: '7', name: 'Chocolate Chip Cookies', description: 'Warm, gooey chocolate chip cookies', category: 'pastries', price: 20, image: 'src/assets/cookies.jpg', is_popular: 0 },
-  { id: '8', name: 'Lemon Tart', description: 'Tangy lemon filling in buttery crust', category: 'pastries', price: 55, image: 'src/assets/lemon-tart.jpg', is_popular: 0 }
-];
-
-// Mock users storage for Vercel (in-memory)
-const MOCK_USERS = new Map();
-
-// Initialize mock admin
-const MOCK_ADMIN = {
-  id: 1,
-  email: 'admin@pamlee.co.za',
-  password: bcrypt.hashSync('admin123', 10),
-  name: 'Admin',
-  role: 'admin'
-};
-MOCK_USERS.set('admin@pamlee.co.za', MOCK_ADMIN);
+// Connect to MongoDB
+connectDB().catch(err => {
+  console.error('Failed to connect to MongoDB:', err);
+});
 
 // ============================
-// Database Schema
+// Seed Initial Data
 // ============================
-function initDatabase() {
-  if (!db) {
-    console.log('⚠️ Skipping database initialization (using mock data)');
-    return;
-  }
-  
-  // Users table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      name TEXT,
-      role TEXT DEFAULT 'customer',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Products table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS products (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      category TEXT NOT NULL,
-      price REAL NOT NULL,
-      image TEXT,
-      is_popular INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Orders table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS orders (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      tracker_id TEXT UNIQUE NOT NULL,
-      user_email TEXT NOT NULL,
-      items TEXT NOT NULL,
-      subtotal REAL NOT NULL,
-      delivery_fee REAL DEFAULT 0,
-      total REAL NOT NULL,
-      payment_method TEXT NOT NULL,
-      fulfilment TEXT NOT NULL,
-      delivery_location TEXT,
-      delivery_address TEXT,
-      status TEXT DEFAULT 'placed',
-      timeline TEXT,
-      placed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  
-  // Add new columns if they don't exist (for existing databases)
+async function seedDatabase() {
   try {
-    db.exec(`ALTER TABLE orders ADD COLUMN delivery_location TEXT`);
-  } catch (e) { /* Column already exists */ }
-  
-  try {
-    db.exec(`ALTER TABLE orders ADD COLUMN delivery_address TEXT`);
-  } catch (e) { /* Column already exists */ }
+    // Check if admin exists
+    const adminExists = await User.findOne({ email: 'admin@pamlee.co.za' });
+    if (!adminExists) {
+      const hashedPassword = bcrypt.hashSync('admin123', 10);
+      await User.create({
+        email: 'admin@pamlee.co.za',
+        password: hashedPassword,
+        name: 'Admin',
+        role: 'admin'
+      });
+      console.log('✅ Admin user created: admin@pamlee.co.za / admin123');
+    }
 
-  // Seed initial products if empty
-  const productCount = db.prepare('SELECT COUNT(*) as count FROM products').get();
-  if (productCount.count === 0) {
-    seedProducts();
-  }
-
-  // Create admin user if not exists
-  const adminExists = db.prepare('SELECT * FROM users WHERE email = ?').get('admin@pamlee.co.za');
-  if (!adminExists) {
-    const hashedPassword = bcrypt.hashSync('admin123', 10);
-    db.prepare('INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)').run(
-      'admin@pamlee.co.za',
-      hashedPassword,
-      'Admin',
-      'admin'
-    );
-    console.log('✅ Admin user created: admin@pamlee.co.za / admin123');
+    // Check if products exist
+    const productCount = await Product.countDocuments();
+    if (productCount === 0) {
+      const products = [
+        { id: '1', name: 'Chocolate Cake', description: 'Rich chocolate layers with creamy frosting', category: 'cakes', price: 250, image: '../src/assets/product-cake.jpg', isPopular: true },
+        { id: '2', name: 'Assorted Cupcakes', description: '6 piece variety pack with different flavors', category: 'cupcakes', price: 120, image: '../src/assets/product-cupcakes.jpg', isPopular: true },
+        { id: '3', name: 'French Pastries', description: 'Buttery, flaky pastries fresh from the oven', category: 'pastries', price: 45, image: '../src/assets/product-pastries.jpg', isPopular: false },
+        { id: '4', name: 'Artisan Bread', description: 'Freshly baked sourdough with crispy crust', category: 'bread', price: 35, image: '../src/assets/product-bread.jpg', isPopular: false },
+        { id: '5', name: 'Vanilla Cake', description: 'Classic vanilla sponge with buttercream', category: 'cakes', price: 220, image: '../src/assets/product-cake.jpg', isPopular: false },
+        { id: '6', name: 'Blueberry Muffins', description: 'Moist muffins packed with fresh blueberries', category: 'muffins', price: 60, image: '../src/assets/product-cupcakes.jpg', isPopular: true },
+        { id: '7', name: 'Croissants', description: 'Light and buttery French croissants', category: 'pastries', price: 25, image: '../src/assets/product-pastries.jpg', isPopular: false },
+        { id: '8', name: 'Whole Wheat Bread', description: 'Healthy whole wheat loaf', category: 'bread', price: 30, image: '../src/assets/product-bread.jpg', isPopular: false }
+      ];
+      await Product.insertMany(products);
+      console.log('✅ Seeded products');
+    }
+  } catch (error) {
+    console.error('Error seeding database:', error);
   }
 }
 
-function seedProducts() {
-  const products = [
-    { id: '1', name: 'Chocolate Cake', description: 'Rich chocolate layers with creamy frosting', category: 'cakes', price: 250, image: '../src/assets/product-cake.jpg', is_popular: 1 },
-    { id: '2', name: 'Assorted Cupcakes', description: '6 piece variety pack with different flavors', category: 'cupcakes', price: 120, image: '../src/assets/product-cupcakes.jpg', is_popular: 1 },
-    { id: '3', name: 'French Pastries', description: 'Buttery, flaky pastries fresh from the oven', category: 'pastries', price: 45, image: '../src/assets/product-pastries.jpg', is_popular: 0 },
-    { id: '4', name: 'Artisan Bread', description: 'Freshly baked sourdough with crispy crust', category: 'bread', price: 35, image: '../src/assets/product-bread.jpg', is_popular: 0 },
-    { id: '5', name: 'Vanilla Cake', description: 'Classic vanilla sponge with buttercream', category: 'cakes', price: 220, image: '../src/assets/product-cake.jpg', is_popular: 0 },
-    { id: '6', name: 'Blueberry Muffins', description: 'Moist muffins packed with fresh blueberries', category: 'muffins', price: 60, image: '../src/assets/product-cupcakes.jpg', is_popular: 1 },
-    { id: '7', name: 'Croissants', description: 'Light and buttery French croissants', category: 'pastries', price: 25, image: '../src/assets/product-pastries.jpg', is_popular: 0 },
-    { id: '8', name: 'Whole Wheat Bread', description: 'Healthy whole wheat loaf', category: 'bread', price: 30, image: '../src/assets/product-bread.jpg', is_popular: 0 }
-  ];
-
-  const insert = db.prepare('INSERT INTO products (id, name, description, category, price, image, is_popular) VALUES (?, ?, ?, ?, ?, ?, ?)');
-  products.forEach(p => insert.run(p.id, p.name, p.description, p.category, p.price, p.image, p.is_popular));
-  console.log('✅ Seeded products');
-}
+// Seed database on startup
+seedDatabase();
 
 // ============================
 // Auth Middleware
@@ -197,7 +93,7 @@ function requireAdmin(req, res, next) {
 // ============================
 // API Routes - Auth
 // ============================
-app.post('/api/auth/signup', (req, res) => {
+app.post('/api/auth/signup', async (req, res) => {
   try {
     const { email, password, name } = req.body;
 
@@ -205,53 +101,36 @@ app.post('/api/auth/signup', (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    let existingUser;
-    let userId;
-    const userName = name || email.split('@')[0];
-    const hashedPassword = bcrypt.hashSync(password, 10);
-
-    if (!db) {
-      // Use mock storage when database is not available
-      if (MOCK_USERS.has(email)) {
-        return res.status(400).json({ error: 'Email already registered' });
-      }
-      
-      userId = MOCK_USERS.size + 1;
-      const newUser = {
-        id: userId,
-        email,
-        password: hashedPassword,
-        name: userName,
-        role: 'customer'
-      };
-      MOCK_USERS.set(email, newUser);
-    } else {
-      existingUser = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-      if (existingUser) {
-        return res.status(400).json({ error: 'Email already registered' });
-      }
-
-      const result = db.prepare('INSERT INTO users (email, password, name) VALUES (?, ?, ?)').run(
-        email,
-        hashedPassword,
-        userName
-      );
-      userId = result.lastInsertRowid;
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already registered' });
     }
 
-    const token = jwt.sign({ id: userId, email, role: 'customer' }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    const user = await User.create({
+      email,
+      password: hashedPassword,
+      name: name || email.split('@')[0],
+      role: 'customer'
+    });
+
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
 
     res.json({
       success: true,
       token,
-      user: { id: userId, email, name: userName, role: 'customer' }
+      user: { id: user._id, email: user.email, name: user.name, role: user.role }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -259,19 +138,9 @@ app.post('/api/auth/login', (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    let user;
-    
-    if (!db) {
-      // Use mock storage when database is not available
-      user = MOCK_USERS.get(email);
-      if (!user) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-    } else {
-      user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-      if (!user) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const validPassword = bcrypt.compareSync(password, user.password);
@@ -279,37 +148,33 @@ app.post('/api/auth/login', (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
 
     res.json({
       success: true,
       token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role }
+      user: { id: user._id, email: user.email, name: user.name, role: user.role }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/auth/me', authenticateToken, (req, res) => {
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
-    let user;
-    
-    if (!db) {
-      // Use mock storage when database is not available
-      user = Array.from(MOCK_USERS.values()).find(u => u.id === req.user.id);
-      if (user) {
-        user = { id: user.id, email: user.email, name: user.name, role: user.role };
-      }
-    } else {
-      user = db.prepare('SELECT id, email, name, role FROM users WHERE id = ?').get(req.user.id);
-    }
-    
+    const user = await User.findById(req.user.id).select('-password');
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    res.json({ success: true, user });
+    res.json({
+      success: true,
+      user: { id: user._id, email: user.email, name: user.name, role: user.role }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -323,31 +188,23 @@ app.get('/api/health', (req, res) => {
     success: true,
     message: 'API is running',
     timestamp: new Date().toISOString(),
-    database: dbPath
+    database: 'MongoDB'
   });
 });
 
 // ============================
 // API Routes - Products
 // ============================
-app.get('/api/products', (req, res) => {
+app.get('/api/products', async (req, res) => {
   try {
     const { category } = req.query;
-    let products;
+    let query = {};
 
-    if (!db) {
-      // Use mock data when database is not available
-      products = MOCK_PRODUCTS;
-      if (category && category !== 'all') {
-        products = products.filter(p => p.category === category);
-      }
-    } else {
-      if (category && category !== 'all') {
-        products = db.prepare('SELECT * FROM products WHERE category = ?').all(category);
-      } else {
-        products = db.prepare('SELECT * FROM products').all();
-      }
+    if (category && category !== 'all') {
+      query.category = category;
     }
+
+    const products = await Product.find(query);
 
     res.json({
       success: true,
@@ -358,7 +215,7 @@ app.get('/api/products', (req, res) => {
         category: p.category,
         price: p.price,
         image: p.image,
-        isPopular: p.is_popular === 1 || p.is_popular === true
+        isPopular: p.isPopular
       }))
     });
   } catch (error) {
@@ -366,16 +223,9 @@ app.get('/api/products', (req, res) => {
   }
 });
 
-app.get('/api/products/:id', (req, res) => {
+app.get('/api/products/:id', async (req, res) => {
   try {
-    let product;
-    
-    if (!db) {
-      // Use mock data when database is not available
-      product = MOCK_PRODUCTS.find(p => p.id === req.params.id);
-    } else {
-      product = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
-    }
+    const product = await Product.findOne({ id: req.params.id });
     
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
@@ -390,7 +240,7 @@ app.get('/api/products/:id', (req, res) => {
         category: product.category,
         price: product.price,
         image: product.image,
-        isPopular: product.is_popular === 1 || product.is_popular === true
+        isPopular: product.isPopular
       }
     });
   } catch (error) {
@@ -398,7 +248,7 @@ app.get('/api/products/:id', (req, res) => {
   }
 });
 
-app.post('/api/products', authenticateToken, requireAdmin, (req, res) => {
+app.post('/api/products', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id, name, description, category, price, image, isPopular } = req.body;
 
@@ -406,19 +256,15 @@ app.post('/api/products', authenticateToken, requireAdmin, (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    if (!db) {
-      return res.status(503).json({ error: 'Database not available. Product management requires persistent storage.' });
-    }
-
-    db.prepare('INSERT INTO products (id, name, description, category, price, image, is_popular) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+    await Product.create({
       id,
       name,
-      description || '',
+      description: description || '',
       category,
       price,
-      image || '',
-      isPopular ? 1 : 0
-    );
+      image: image || '',
+      isPopular: isPopular || false
+    });
 
     res.json({ success: true, message: 'Product created' });
   } catch (error) {
@@ -426,22 +272,13 @@ app.post('/api/products', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
-app.put('/api/products/:id', authenticateToken, requireAdmin, (req, res) => {
+app.put('/api/products/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { name, description, category, price, image, isPopular } = req.body;
 
-    if (!db) {
-      return res.status(503).json({ error: 'Database not available. Product management requires persistent storage.' });
-    }
-
-    db.prepare('UPDATE products SET name = ?, description = ?, category = ?, price = ?, image = ?, is_popular = ? WHERE id = ?').run(
-      name,
-      description,
-      category,
-      price,
-      image,
-      isPopular ? 1 : 0,
-      req.params.id
+    await Product.findOneAndUpdate(
+      { id: req.params.id },
+      { name, description, category, price, image, isPopular }
     );
 
     res.json({ success: true, message: 'Product updated' });
@@ -450,13 +287,9 @@ app.put('/api/products/:id', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
-app.delete('/api/products/:id', authenticateToken, requireAdmin, (req, res) => {
+app.delete('/api/products/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    if (!db) {
-      return res.status(503).json({ error: 'Database not available. Product management requires persistent storage.' });
-    }
-    
-    db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
+    await Product.findOneAndDelete({ id: req.params.id });
     res.json({ success: true, message: 'Product deleted' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -466,7 +299,7 @@ app.delete('/api/products/:id', authenticateToken, requireAdmin, (req, res) => {
 // ============================
 // API Routes - Orders
 // ============================
-app.post('/api/orders', (req, res) => {
+app.post('/api/orders', async (req, res) => {
   try {
     const { trackerId, userEmail, items, subtotal, deliveryFee, total, paymentMethod, fulfilment, deliveryLocation, deliveryAddress } = req.body;
 
@@ -474,32 +307,25 @@ app.post('/api/orders', (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    if (!db) {
-      return res.status(503).json({ error: 'Database not available. Order placement requires persistent storage.' });
-    }
-
-    const timeline = JSON.stringify([{
+    const timeline = [{
       date: new Date().toLocaleString(),
       status: 'placed',
       message: 'Order placed successfully.'
-    }]);
+    }];
 
-    db.prepare(`
-      INSERT INTO orders (tracker_id, user_email, items, subtotal, delivery_fee, total, payment_method, fulfilment, delivery_location, delivery_address, timeline)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    await Order.create({
       trackerId,
       userEmail,
-      JSON.stringify(items),
+      items,
       subtotal,
-      deliveryFee || 0,
+      deliveryFee: deliveryFee || 0,
       total,
       paymentMethod,
       fulfilment,
-      deliveryLocation || 'N/A',
-      deliveryAddress || 'N/A',
+      deliveryLocation: deliveryLocation || 'N/A',
+      deliveryAddress: deliveryAddress || 'N/A',
       timeline
-    );
+    });
 
     res.json({ success: true, trackerId, message: 'Order placed successfully' });
   } catch (error) {
@@ -507,38 +333,34 @@ app.post('/api/orders', (req, res) => {
   }
 });
 
-app.get('/api/orders', authenticateToken, (req, res) => {
+app.get('/api/orders', authenticateToken, async (req, res) => {
   try {
-    if (!db) {
-      return res.status(503).json({ error: 'Database not available. Order history requires persistent storage.' });
+    let query = {};
+
+    if (req.user.role !== 'admin') {
+      query.userEmail = req.user.email;
     }
 
-    let orders;
-
-    if (req.user.role === 'admin') {
-      orders = db.prepare('SELECT * FROM orders ORDER BY placed_at DESC').all();
-    } else {
-      orders = db.prepare('SELECT * FROM orders WHERE user_email = ? ORDER BY placed_at DESC').all(req.user.email);
-    }
+    const orders = await Order.find(query).sort({ placedAt: -1 });
 
     res.json({
       success: true,
       orders: orders.map(o => ({
-        id: o.id,
-        trackerId: o.tracker_id,
-        userEmail: o.user_email,
-        items: JSON.parse(o.items),
+        id: o._id,
+        trackerId: o.trackerId,
+        userEmail: o.userEmail,
+        items: o.items,
         subtotal: o.subtotal,
-        deliveryFee: o.delivery_fee,
+        deliveryFee: o.deliveryFee,
         total: o.total,
-        paymentMethod: o.payment_method,
+        paymentMethod: o.paymentMethod,
         fulfilment: o.fulfilment,
-        deliveryLocation: o.delivery_location,
-        deliveryAddress: o.delivery_address,
+        deliveryLocation: o.deliveryLocation,
+        deliveryAddress: o.deliveryAddress,
         status: o.status,
-        timeline: JSON.parse(o.timeline || '[]'),
-        placedAt: o.placed_at,
-        updatedAt: o.updated_at
+        timeline: o.timeline,
+        placedAt: o.placedAt,
+        updatedAt: o.updatedAt
       }))
     });
   } catch (error) {
@@ -546,13 +368,9 @@ app.get('/api/orders', authenticateToken, (req, res) => {
   }
 });
 
-app.get('/api/orders/:trackerId', (req, res) => {
+app.get('/api/orders/:trackerId', async (req, res) => {
   try {
-    if (!db) {
-      return res.status(503).json({ error: 'Database not available. Order tracking requires persistent storage.' });
-    }
-
-    const order = db.prepare('SELECT * FROM orders WHERE tracker_id = ?').get(req.params.trackerId);
+    const order = await Order.findOne({ trackerId: req.params.trackerId });
 
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
@@ -561,21 +379,21 @@ app.get('/api/orders/:trackerId', (req, res) => {
     res.json({
       success: true,
       order: {
-        id: order.id,
-        trackerId: order.tracker_id,
-        userEmail: order.user_email,
-        items: JSON.parse(order.items),
+        id: order._id,
+        trackerId: order.trackerId,
+        userEmail: order.userEmail,
+        items: order.items,
         subtotal: order.subtotal,
-        deliveryFee: order.delivery_fee,
+        deliveryFee: order.deliveryFee,
         total: order.total,
-        paymentMethod: order.payment_method,
+        paymentMethod: order.paymentMethod,
         fulfilment: order.fulfilment,
-        deliveryLocation: order.delivery_location,
-        deliveryAddress: order.delivery_address,
+        deliveryLocation: order.deliveryLocation,
+        deliveryAddress: order.deliveryAddress,
         status: order.status,
-        timeline: JSON.parse(order.timeline || '[]'),
-        placedAt: order.placed_at,
-        updatedAt: order.updated_at
+        timeline: order.timeline,
+        placedAt: order.placedAt,
+        updatedAt: order.updatedAt
       }
     });
   } catch (error) {
@@ -583,31 +401,23 @@ app.get('/api/orders/:trackerId', (req, res) => {
   }
 });
 
-app.put('/api/orders/:trackerId', authenticateToken, requireAdmin, (req, res) => {
+app.put('/api/orders/:trackerId', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    if (!db) {
-      return res.status(503).json({ error: 'Database not available. Order management requires persistent storage.' });
-    }
-
     const { status, note } = req.body;
 
-    const order = db.prepare('SELECT * FROM orders WHERE tracker_id = ?').get(req.params.trackerId);
+    const order = await Order.findOne({ trackerId: req.params.trackerId });
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    const timeline = JSON.parse(order.timeline || '[]');
-    timeline.push({
+    order.timeline.push({
       date: new Date().toLocaleString(),
       status: status,
       message: note || `Order status updated to "${status}"`
     });
+    order.status = status;
 
-    db.prepare('UPDATE orders SET status = ?, timeline = ?, updated_at = CURRENT_TIMESTAMP WHERE tracker_id = ?').run(
-      status,
-      JSON.stringify(timeline),
-      req.params.trackerId
-    );
+    await order.save();
 
     res.json({ success: true, message: 'Order updated' });
   } catch (error) {
@@ -618,31 +428,20 @@ app.put('/api/orders/:trackerId', authenticateToken, requireAdmin, (req, res) =>
 // ============================
 // API Routes - Stats (Admin)
 // ============================
-app.get('/api/stats', authenticateToken, requireAdmin, (req, res) => {
+app.get('/api/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    if (!db) {
-      // Return mock stats when database is not available
-      return res.json({
-        success: true,
-        stats: {
-          totalOrders: 0,
-          totalRevenue: 0,
-          pendingOrders: 0,
-          totalProducts: MOCK_PRODUCTS.length
-        }
-      });
-    }
-
-    const totalOrders = db.prepare('SELECT COUNT(*) as count FROM orders').get().count;
-    const totalRevenue = db.prepare('SELECT SUM(total) as sum FROM orders').get().sum || 0;
-    const pendingOrders = db.prepare('SELECT COUNT(*) as count FROM orders WHERE status = "placed"').get().count;
-    const totalProducts = db.prepare('SELECT COUNT(*) as count FROM products').get().count;
+    const totalOrders = await Order.countDocuments();
+    const totalRevenue = await Order.aggregate([
+      { $group: { _id: null, total: { $sum: '$total' } } }
+    ]);
+    const pendingOrders = await Order.countDocuments({ status: 'placed' });
+    const totalProducts = await Product.countDocuments();
 
     res.json({
       success: true,
       stats: {
         totalOrders,
-        totalRevenue,
+        totalRevenue: totalRevenue[0]?.total || 0,
         pendingOrders,
         totalProducts
       }
@@ -653,13 +452,8 @@ app.get('/api/stats', authenticateToken, requireAdmin, (req, res) => {
 });
 
 // ============================
-// Initialize and Start Server
+// Start Server
 // ============================
-
-// Initialize database immediately (important for serverless)
-initDatabase();
-
-// Start server (only if not in Vercel serverless environment)
 if (process.env.VERCEL !== '1') {
   app.listen(PORT, () => {
     console.log(`
@@ -667,20 +461,11 @@ if (process.env.VERCEL !== '1') {
 ║   Pam_Lee's Kitchen Backend Server     ║
 ╠════════════════════════════════════════╣
 ║  🚀 Server running on port ${PORT}       ║
-║  📊 Database: ${dbPath}                ║
+║  📊 Database: MongoDB                  ║
 ║  🔐 Admin: admin@pamlee.co.za          ║
 ║  🔑 Password: admin123                 ║
 ╚════════════════════════════════════════╝
     `);
-  });
-
-  // Graceful shutdown
-  process.on('SIGINT', () => {
-    if (db) {
-      db.close();
-      console.log('\n✅ Database connection closed');
-    }
-    process.exit(0);
   });
 }
 
