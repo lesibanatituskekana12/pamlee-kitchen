@@ -201,11 +201,14 @@ function updateStats(orders) {
 function renderOrders(orders) {
     const container = document.getElementById('ordersContainer');
     
-    if (orders.length === 0) {
+    console.log('renderOrders called with:', orders?.length || 0, 'orders');
+    
+    if (!orders || orders.length === 0) {
         container.innerHTML = `
             <h2 style="margin-bottom:1rem;">Recent Orders</h2>
             <div class="feature-card" style="padding:2rem;text-align:center;">
-                <p style="color:var(--muted-foreground);">No orders yet</p>
+                <p style="color:var(--muted-foreground);">No orders yet. Check browser console for details.</p>
+                <button class="btn btn-gold" onclick="location.reload()" style="margin-top:1rem;">Refresh Page</button>
             </div>
         `;
         return;
@@ -369,11 +372,31 @@ function toggleHealthWidget() {
     }
 }
 
+// Force Refresh Orders
+async function forceRefreshOrders() {
+    console.log('Force refreshing orders...');
+    showToast('🔄 Refreshing orders...');
+    
+    if (window.RealtimeOrders) {
+        try {
+            await window.RealtimeOrders.fetchOrders('admin');
+            showToast('✅ Orders refreshed!');
+        } catch (error) {
+            console.error('Error refreshing orders:', error);
+            showToast('❌ Failed to refresh orders');
+        }
+    } else {
+        showToast('❌ Real-time system not available');
+        setTimeout(() => location.reload(), 1000);
+    }
+}
+
 // Expose functions globally for onclick handlers
 window.updateOrderStatus = updateOrderStatus;
 window.filterOrders = filterOrders;
 window.viewOrderDetails = viewOrderDetails;
 window.toggleHealthWidget = toggleHealthWidget;
+window.forceRefreshOrders = forceRefreshOrders;
 
 // Show Order Details Modal
 function showOrderDetailsModal(order) {
