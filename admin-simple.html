@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Pam_Lee's Kitchen</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .order-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .order-id {
+      font-weight: 600;
+      color: var(--primary);
+    }
+    .order-status {
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .status-placed { background: #dbeafe; color: #1e40af; }
+    .status-preparing { background: #fef3c7; color: #92400e; }
+    .status-ready { background: #d1fae5; color: #065f46; }
+    .status-completed { background: #e0e7ff; color: #3730a3; }
+  </style>
+</head>
+<body>
+  <header class="navbar">
+    <div class="navbar-content">
+      <div class="navbar-brand">
+        <span class="brand-name">Pam_Lee's Kitchen - Admin</span>
+      </div>
+      <button class="btn btn-outline" onclick="logout()">Logout</button>
+    </div>
+  </header>
+
+  <main class="page-content">
+    <div class="container">
+      <div class="page-header">
+        <h1>Admin <span class="text-gradient-gold">Dashboard</span></h1>
+        <p>Manage customer orders</p>
+        <button class="btn btn-gold" onclick="loadOrders()" style="margin-top:1rem;">🔄 Refresh</button>
+      </div>
+
+      <!-- Stats -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin:2rem 0;">
+        <div class="feature-card" style="padding:1.5rem;text-align:center;">
+          <h3 id="totalOrders" style="margin:0;color:var(--secondary);">-</h3>
+          <p style="margin:0.5rem 0 0;color:var(--muted-foreground);">Total Orders</p>
+        </div>
+        <div class="feature-card" style="padding:1.5rem;text-align:center;">
+          <h3 id="totalRevenue" style="margin:0;color:var(--secondary);">R 0</h3>
+          <p style="margin:0.5rem 0 0;color:var(--muted-foreground);">Total Revenue</p>
+        </div>
+        <div class="feature-card" style="padding:1.5rem;text-align:center;">
+          <h3 id="pendingOrders" style="margin:0;color:var(--secondary);">-</h3>
+          <p style="margin:0.5rem 0 0;color:var(--muted-foreground);">Pending Orders</p>
+        </div>
+        <div class="feature-card" style="padding:1.5rem;text-align:center;">
+          <h3 id="totalProducts" style="margin:0;color:var(--secondary);">8</h3>
+          <p style="margin:0.5rem 0 0;color:var(--muted-foreground);">Total Products</p>
+        </div>
+      </div>
+
+      <!-- Orders -->
+      <div>
+        <h2>Recent Orders</h2>
+        <div id="ordersContainer">
+          <p style="text-align:center;color:var(--muted-foreground);">Loading...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Check authentication
+    const user = JSON.parse(localStorage.getItem('pamlee_user') || 'null');
+    if (!user || !user.token || user.role !== 'admin') {
+      alert('Please login as admin first');
+      window.location.href = 'login.html';
+    }
+
+    console.log('Logged in as:', user.email, 'Role:', user.role);
+
+    // Load stats
+    async function loadStats() {
+      try {
+        const response = await fetch('/api/stats', {
+          headers: {
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+        
+        const data = await response.json();
+        console.log('Stats:', data);
+        
+        if (data.success) {
+          document.getElementById('totalOrders').textContent = data.stats.totalOrders;
+          document.getElementById('totalRevenue').textContent = `R ${data.stats.totalRevenue.toFixed(2)}`;
+          document.getElementById('pendingOrders').textContent = data.stats.pendingOrders;
+          document.getElementById('totalProducts').textContent = data.stats.totalProducts;
+        }
+      } catch (error) {
+        console.error('Error loading stats:', error);
+      }
+    }
+
+    // Load orders
+    async function loadOrders() {
+      const container = document.getElementById('ordersContainer');
+      container.innerHTML = '<p style="text-align:center;color:var(--muted-foreground);">Loading orders...</p>';
+      
+      try {
+        console.log('Fetching orders with token:', user.token.substring(0, 20) + '...');
+        
+        const response = await fetch('/api/orders', {
+          headers: {
+            'Authorization': `Bearer ${user.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log('Response status:', response.status);
+        
+        const data = await response.json();
+        console.log('Orders data:', data);
+        
+        if (!data.success) {
+          container.innerHTML = `<p style="text-align:center;color:red;">Error: ${data.error}</p>`;
+          return;
+        }
+        
+        const orders = data.orders;
+        console.log('Total orders:', orders.length);
+        
+        if (orders.length === 0) {
+          container.innerHTML = '<p style="text-align:center;color:var(--muted-foreground);">No orders yet</p>';
+          return;
+        }
+        
+        // Render orders
+        container.innerHTML = orders.map(order => `
+          <div class="order-card">
+            <div class="order-header">
+              <div>
+                <div class="order-id">📝 ${order.trackerId}</div>
+                <div style="font-size:0.875rem;color:var(--muted-foreground);margin-top:0.25rem;">
+                  ${new Date(order.placedAt).toLocaleString()}
+                </div>
+              </div>
+              <div>
+                <div style="font-size:1.25rem;font-weight:600;color:var(--secondary);">
+                  R ${order.total.toFixed(2)}
+                </div>
+                <div class="order-status status-${order.status}">
+                  ${order.status.toUpperCase()}
+                </div>
+              </div>
+            </div>
+            <div style="font-size:0.875rem;color:var(--muted-foreground);">
+              <div><strong>Customer:</strong> ${order.userEmail}</div>
+              <div><strong>Payment:</strong> ${order.paymentMethod.toUpperCase()}</div>
+              <div><strong>Fulfillment:</strong> ${order.fulfilment === 'pickup' ? '🏪 Pickup' : '🚚 Delivery'}</div>
+              <div><strong>Items:</strong> ${order.items.length} item(s)</div>
+            </div>
+            <div style="margin-top:1rem;">
+              <select onchange="updateOrderStatus('${order.trackerId}', this.value)" style="padding:0.5rem;border-radius:4px;border:1px solid var(--border);">
+                <option value="">Change Status...</option>
+                <option value="preparing" ${order.status === 'preparing' ? 'selected' : ''}>Preparing</option>
+                <option value="ready" ${order.status === 'ready' ? 'selected' : ''}>Ready</option>
+                <option value="completed" ${order.status === 'completed' ? 'selected' : ''}>Completed</option>
+              </select>
+            </div>
+          </div>
+        `).join('');
+        
+      } catch (error) {
+        console.error('Error loading orders:', error);
+        container.innerHTML = `<p style="text-align:center;color:red;">Error: ${error.message}</p>`;
+      }
+    }
+
+    // Update order status
+    async function updateOrderStatus(trackerId, newStatus) {
+      if (!newStatus) return;
+      
+      try {
+        const response = await fetch(`/api/orders/${trackerId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${user.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status: newStatus,
+            note: `Status updated to ${newStatus}`
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          alert('✅ Order status updated!');
+          loadOrders();
+        } else {
+          alert('❌ Error: ' + data.error);
+        }
+      } catch (error) {
+        console.error('Error updating order:', error);
+        alert('❌ Error updating order');
+      }
+    }
+
+    // Logout
+    function logout() {
+      localStorage.removeItem('pamlee_user');
+      window.location.href = 'login.html';
+    }
+
+    // Load data on page load
+    loadStats();
+    loadOrders();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(() => {
+      loadStats();
+      loadOrders();
+    }, 30000);
+  </script>
+</body>
+</html>
