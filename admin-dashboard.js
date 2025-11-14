@@ -111,12 +111,22 @@ function logout() {
 
 // Initialize Dashboard
 async function initializeDashboard() {
+    // Verify user is logged in
+    const user = JSON.parse(localStorage.getItem('pamlee_user') || 'null');
+    if (!user || !user.token) {
+        console.error('No valid user session found');
+        alert('Please login first');
+        window.location.href = 'login.html';
+        return;
+    }
+
+    console.log('Initializing dashboard for:', user.email, 'Role:', user.role);
+
     // Check if RealtimeOrders is available
     if (!window.RealtimeOrders) {
         console.error('RealtimeOrders not loaded!');
         showToast('❌ Error: Real-time system not available. Please refresh the page.');
         
-        // Show loading state
         document.getElementById('ordersContainer').innerHTML = `
             <h2 style="margin-bottom:1rem;">Recent Orders</h2>
             <div class="feature-card" style="padding:2rem;text-align:center;">
@@ -137,7 +147,7 @@ async function initializeDashboard() {
         
         // Subscribe to order updates first
         window.RealtimeOrders.subscribe((orders) => {
-            console.log('Orders received:', orders.length);
+            console.log('Orders received in subscription:', orders.length);
             updateStats(orders);
             renderOrders(orders);
         });
@@ -154,9 +164,13 @@ async function initializeDashboard() {
         });
         
         // Start real-time polling (this will trigger the subscriptions)
-        console.log('Starting polling...');
+        console.log('Starting polling for admin...');
         await window.RealtimeOrders.startPolling('admin');
-        console.log('Polling started');
+        console.log('Polling started successfully');
+        
+        // Force initial fetch
+        console.log('Forcing initial fetch...');
+        await window.RealtimeOrders.fetchOrders('admin');
     } catch (error) {
         console.error('Error initializing dashboard:', error);
         showToast('❌ Error loading orders. Please refresh the page.');

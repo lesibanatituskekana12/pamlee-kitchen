@@ -58,24 +58,27 @@
             
             console.log('fetchOrders called:', { userRole, hasUser: !!user, userEmail: user?.email });
             
-            if (!user && userRole !== 'guest') {
-                console.warn('No user found in localStorage, using fallback');
-                // Fallback to localStorage for guest users
-                this.orders = JSON.parse(localStorage.getItem('pamlee_orders') || '[]');
+            if (!user) {
+                console.error('No user found in localStorage - cannot fetch orders');
+                this.orders = [];
                 this.notifyListeners(this.orders);
                 return;
             }
 
-            const token = user?.token;
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
+            const token = user.token;
+            if (!token) {
+                console.error('No token found - cannot fetch orders');
+                this.orders = [];
+                this.notifyListeners(this.orders);
+                return;
             }
 
-            console.log('Fetching orders from API...');
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+
+            console.log('Fetching orders from API with token...');
             const response = await fetch(`${API_BASE}/orders`, { headers });
             
             if (!response.ok) {
