@@ -137,6 +137,44 @@ async function initializeDashboard() {
     }
 
     try {
+        // Check API health first
+        console.log('Checking API health...');
+        const healthCheck = await fetch('/api/health').then(r => r.json()).catch(() => null);
+        console.log('Health check result:', healthCheck);
+        
+        if (!healthCheck || !healthCheck.success) {
+            document.getElementById('ordersContainer').innerHTML = `
+                <h2 style="margin-bottom:1rem;">Recent Orders</h2>
+                <div class="feature-card" style="padding:2rem;text-align:center;">
+                    <p style="color:var(--error);font-size:1.1rem;">❌ API Connection Failed</p>
+                    <p style="color:var(--muted-foreground);margin-top:1rem;">
+                        Cannot connect to backend API. Please check if the server is running.
+                    </p>
+                    <button class="btn btn-gold" onclick="location.reload()" style="margin-top:1rem;">Retry</button>
+                </div>
+            `;
+            return;
+        }
+        
+        if (healthCheck.database !== 'MongoDB') {
+            document.getElementById('ordersContainer').innerHTML = `
+                <h2 style="margin-bottom:1rem;">Recent Orders</h2>
+                <div class="feature-card" style="padding:2rem;text-align:center;">
+                    <p style="color:var(--warning);font-size:1.1rem;">⚠️ Database Not Connected</p>
+                    <p style="color:var(--muted-foreground);margin-top:1rem;">
+                        MongoDB is not connected. Please add environment variables in Vercel.
+                    </p>
+                    <p style="margin-top:0.5rem;">
+                        <a href="https://github.com/lesibanatituskekana12/pamlee-kitchen/blob/main/URGENT_FIX_VERCEL.md" 
+                           target="_blank" class="btn btn-outline">
+                            📖 Setup Guide
+                        </a>
+                    </p>
+                </div>
+            `;
+            return;
+        }
+        
         // Show loading state
         document.getElementById('ordersContainer').innerHTML = `
             <h2 style="margin-bottom:1rem;">Recent Orders</h2>
@@ -216,13 +254,43 @@ function renderOrders(orders) {
     const container = document.getElementById('ordersContainer');
     
     console.log('renderOrders called with:', orders?.length || 0, 'orders');
+    console.log('Orders data:', orders);
     
     if (!orders || orders.length === 0) {
+        // Check if this is a database connection issue
+        const hasStats = document.getElementById('totalOrders')?.textContent !== '0';
+        
+        let message = 'No orders yet.';
+        let hint = '';
+        
+        if (hasStats) {
+            // Stats show orders but we can't display them
+            message = '⚠️ Database Connection Issue';
+            hint = `
+                <p style="margin-top:1rem;color:var(--muted-foreground);font-size:0.9rem;">
+                    Stats show ${document.getElementById('totalOrders')?.textContent || '0'} orders, but they cannot be loaded.<br>
+                    <strong>This usually means MongoDB environment variables are not set in Vercel.</strong>
+                </p>
+                <p style="margin-top:0.5rem;color:var(--muted-foreground);font-size:0.9rem;">
+                    Please add <code>MONGO_URI</code>, <code>JWT_SECRET</code>, <code>JWT_EXPIRES_IN</code>, and <code>NODE_ENV</code> 
+                    to your Vercel environment variables.
+                </p>
+                <p style="margin-top:0.5rem;">
+                    <a href="https://github.com/lesibanatituskekana12/pamlee-kitchen/blob/main/URGENT_FIX_VERCEL.md" 
+                       target="_blank" class="btn btn-outline" style="margin-right:0.5rem;">
+                        📖 Setup Guide
+                    </a>
+                </p>
+            `;
+        }
+        
         container.innerHTML = `
             <h2 style="margin-bottom:1rem;">Recent Orders</h2>
             <div class="feature-card" style="padding:2rem;text-align:center;">
-                <p style="color:var(--muted-foreground);">No orders yet. Check browser console for details.</p>
+                <p style="color:var(--muted-foreground);font-size:1.1rem;margin-bottom:0.5rem;">${message}</p>
+                ${hint}
                 <button class="btn btn-gold" onclick="location.reload()" style="margin-top:1rem;">Refresh Page</button>
+                <button class="btn btn-outline" onclick="console.log('Debug Info:', {orders: window.RealtimeOrders?.orders, localStorage: localStorage.getItem('pamlee_orders')})" style="margin-top:1rem;margin-left:0.5rem;">Show Debug Info</button>
             </div>
         `;
         return;

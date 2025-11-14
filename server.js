@@ -209,12 +209,40 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 // ============================
 // API Routes - Health Check
 // ============================
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  const mongoose = require('mongoose');
+  
+  let dbStatus = 'Disconnected';
+  let dbConnected = false;
+  
+  try {
+    // Check mongoose connection state
+    if (mongoose.connection.readyState === 1) {
+      dbStatus = 'MongoDB';
+      dbConnected = true;
+    } else if (mongoose.connection.readyState === 2) {
+      dbStatus = 'Connecting';
+    } else if (mongoose.connection.readyState === 0) {
+      dbStatus = 'Disconnected';
+    }
+    
+    // Try to ping the database
+    if (dbConnected) {
+      await mongoose.connection.db.admin().ping();
+    }
+  } catch (error) {
+    console.error('Health check DB error:', error);
+    dbStatus = 'Error';
+    dbConnected = false;
+  }
+  
   res.json({
     success: true,
     message: 'API is running',
     timestamp: new Date().toISOString(),
-    database: 'MongoDB'
+    database: dbStatus,
+    connected: dbConnected,
+    mongoUri: process.env.MONGO_URI ? 'Set' : 'Not Set'
   });
 });
 
