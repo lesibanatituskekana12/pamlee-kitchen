@@ -54,13 +54,18 @@ const MOCK_PRODUCTS = [
   { id: '8', name: 'Lemon Tart', description: 'Tangy lemon filling in buttery crust', category: 'pastries', price: 55, image: 'src/assets/lemon-tart.jpg', is_popular: 0 }
 ];
 
+// Mock users storage for Vercel (in-memory)
+const MOCK_USERS = new Map();
+
+// Initialize mock admin
 const MOCK_ADMIN = {
   id: 1,
   email: 'admin@pamlee.co.za',
-  password: '$2a$10$rN8qH5xH5xH5xH5xH5xH5.O5xH5xH5xH5xH5xH5xH5xH5xH5xH5xH', // admin123
+  password: bcrypt.hashSync('admin123', 10),
   name: 'Admin',
   role: 'admin'
 };
+MOCK_USERS.set('admin@pamlee.co.za', MOCK_ADMIN);
 
 // ============================
 // Database Schema
@@ -200,24 +205,46 @@ app.post('/api/auth/signup', (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    const existingUser = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email already registered' });
+    let existingUser;
+    let userId;
+    const userName = name || email.split('@')[0];
+    const hashedPassword = bcrypt.hashSync(password, 10);
+
+    if (!db) {
+      // Use mock storage when database is not available
+      if (MOCK_USERS.has(email)) {
+        return res.status(400).json({ error: 'Email already registered' });
+      }
+      
+      userId = MOCK_USERS.size + 1;
+      const newUser = {
+        id: userId,
+        email,
+        password: hashedPassword,
+        name: userName,
+        role: 'customer'
+      };
+      MOCK_USERS.set(email, newUser);
+    } else {
+      existingUser = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+      if (existingUser) {
+        return res.status(400).json({ error: 'Email already registered' });
+      }
+
+      const result = db.prepare('INSERT INTO users (email, password, name) VALUES (?, ?, ?)').run(
+        email,
+        hashedPassword,
+        userName
+      );
+      userId = result.lastInsertRowid;
     }
 
-    const hashedPassword = bcrypt.hashSync(password, 10);
-    const result = db.prepare('INSERT INTO users (email, password, name) VALUES (?, ?, ?)').run(
-      email,
-      hashedPassword,
-      name || email.split('@')[0]
-    );
-
-    const token = jwt.sign({ id: result.lastInsertRowid, email, role: 'customer' }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    const token = jwt.sign({ id: userId, email, role: 'customer' }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
     res.json({
       success: true,
       token,
-      user: { id: result.lastInsertRowid, email, name: name || email.split('@')[0], role: 'customer' }
+      user: { id: userId, email, name: userName, role: 'customer' }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -235,10 +262,9 @@ app.post('/api/auth/login', (req, res) => {
     let user;
     
     if (!db) {
-      // Use mock admin when database is not available
-      if (email === MOCK_ADMIN.email && password === 'admin123') {
-        user = MOCK_ADMIN;
-      } else {
+      // Use mock storage when database is not available
+      user = MOCK_USERS.get(email);
+      if (!user) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
     } else {
@@ -246,11 +272,11 @@ app.post('/api/auth/login', (req, res) => {
       if (!user) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
+    }
 
-      const validPassword = bcrypt.compareSync(password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
+    const validPassword = bcrypt.compareSync(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -267,7 +293,22 @@ app.post('/api/auth/login', (req, res) => {
 
 app.get('/api/auth/me', authenticateToken, (req, res) => {
   try {
-    const user = db.prepare('SELECT id, email, name, role FROM users WHERE id = ?').get(req.user.id);
+    let user;
+    
+    if (!db) {
+      // Use mock storage when database is not available
+      user = Array.from(MOCK_USERS.values()).find(u => u.id === req.user.id);
+      if (user) {
+        user = { id: user.id, email: user.email, name: user.name, role: user.role };
+      }
+    } else {
+      user = db.prepare('SELECT id, email, name, role FROM users WHERE id = ?').get(req.user.id);
+    }
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
     res.json({ success: true, user });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -327,7 +368,15 @@ app.get('/api/products', (req, res) => {
 
 app.get('/api/products/:id', (req, res) => {
   try {
-    const product = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+    let product;
+    
+    if (!db) {
+      // Use mock data when database is not available
+      product = MOCK_PRODUCTS.find(p => p.id === req.params.id);
+    } else {
+      product = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+    }
+    
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
@@ -341,7 +390,7 @@ app.get('/api/products/:id', (req, res) => {
         category: product.category,
         price: product.price,
         image: product.image,
-        isPopular: product.is_popular === 1
+        isPopular: product.is_popular === 1 || product.is_popular === true
       }
     });
   } catch (error) {
@@ -355,6 +404,10 @@ app.post('/api/products', authenticateToken, requireAdmin, (req, res) => {
 
     if (!id || !name || !category || !price) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (!db) {
+      return res.status(503).json({ error: 'Database not available. Product management requires persistent storage.' });
     }
 
     db.prepare('INSERT INTO products (id, name, description, category, price, image, is_popular) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
@@ -377,6 +430,10 @@ app.put('/api/products/:id', authenticateToken, requireAdmin, (req, res) => {
   try {
     const { name, description, category, price, image, isPopular } = req.body;
 
+    if (!db) {
+      return res.status(503).json({ error: 'Database not available. Product management requires persistent storage.' });
+    }
+
     db.prepare('UPDATE products SET name = ?, description = ?, category = ?, price = ?, image = ?, is_popular = ? WHERE id = ?').run(
       name,
       description,
@@ -395,6 +452,10 @@ app.put('/api/products/:id', authenticateToken, requireAdmin, (req, res) => {
 
 app.delete('/api/products/:id', authenticateToken, requireAdmin, (req, res) => {
   try {
+    if (!db) {
+      return res.status(503).json({ error: 'Database not available. Product management requires persistent storage.' });
+    }
+    
     db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: 'Product deleted' });
   } catch (error) {
@@ -411,6 +472,10 @@ app.post('/api/orders', (req, res) => {
 
     if (!trackerId || !userEmail || !items || !total) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (!db) {
+      return res.status(503).json({ error: 'Database not available. Order placement requires persistent storage.' });
     }
 
     const timeline = JSON.stringify([{
@@ -444,6 +509,10 @@ app.post('/api/orders', (req, res) => {
 
 app.get('/api/orders', authenticateToken, (req, res) => {
   try {
+    if (!db) {
+      return res.status(503).json({ error: 'Database not available. Order history requires persistent storage.' });
+    }
+
     let orders;
 
     if (req.user.role === 'admin') {
@@ -479,6 +548,10 @@ app.get('/api/orders', authenticateToken, (req, res) => {
 
 app.get('/api/orders/:trackerId', (req, res) => {
   try {
+    if (!db) {
+      return res.status(503).json({ error: 'Database not available. Order tracking requires persistent storage.' });
+    }
+
     const order = db.prepare('SELECT * FROM orders WHERE tracker_id = ?').get(req.params.trackerId);
 
     if (!order) {
@@ -512,6 +585,10 @@ app.get('/api/orders/:trackerId', (req, res) => {
 
 app.put('/api/orders/:trackerId', authenticateToken, requireAdmin, (req, res) => {
   try {
+    if (!db) {
+      return res.status(503).json({ error: 'Database not available. Order management requires persistent storage.' });
+    }
+
     const { status, note } = req.body;
 
     const order = db.prepare('SELECT * FROM orders WHERE tracker_id = ?').get(req.params.trackerId);
@@ -543,6 +620,19 @@ app.put('/api/orders/:trackerId', authenticateToken, requireAdmin, (req, res) =>
 // ============================
 app.get('/api/stats', authenticateToken, requireAdmin, (req, res) => {
   try {
+    if (!db) {
+      // Return mock stats when database is not available
+      return res.json({
+        success: true,
+        stats: {
+          totalOrders: 0,
+          totalRevenue: 0,
+          pendingOrders: 0,
+          totalProducts: MOCK_PRODUCTS.length
+        }
+      });
+    }
+
     const totalOrders = db.prepare('SELECT COUNT(*) as count FROM orders').get().count;
     const totalRevenue = db.prepare('SELECT SUM(total) as sum FROM orders').get().sum || 0;
     const pendingOrders = db.prepare('SELECT COUNT(*) as count FROM orders WHERE status = "placed"').get().count;
@@ -586,8 +676,10 @@ if (process.env.VERCEL !== '1') {
 
   // Graceful shutdown
   process.on('SIGINT', () => {
-    db.close();
-    console.log('\n✅ Database connection closed');
+    if (db) {
+      db.close();
+      console.log('\n✅ Database connection closed');
+    }
     process.exit(0);
   });
 }
