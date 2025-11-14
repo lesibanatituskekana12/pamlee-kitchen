@@ -296,10 +296,23 @@ function renderOrders(orders) {
         return;
     }
     
-    // Sort orders by date (newest first)
-    const sortedOrders = [...orders].sort((a, b) => {
-        const dateA = new Date(a.placedAt || a.placed_at);
-        const dateB = new Date(b.placedAt || b.placed_at);
+    // Filter out invalid orders and sort by date (newest first)
+    const validOrders = orders.filter(order => order && order.trackerId);
+    
+    if (validOrders.length === 0) {
+        container.innerHTML = `
+            <h2 style="margin-bottom:1rem;">Recent Orders</h2>
+            <div class="feature-card" style="padding:2rem;text-align:center;">
+                <p style="color:var(--muted-foreground);">No valid orders found.</p>
+                <button class="btn btn-gold" onclick="location.reload()" style="margin-top:1rem;">Refresh Page</button>
+            </div>
+        `;
+        return;
+    }
+    
+    const sortedOrders = [...validOrders].sort((a, b) => {
+        const dateA = new Date(a.placedAt || a.placed_at || 0);
+        const dateB = new Date(b.placedAt || b.placed_at || 0);
         return dateB - dateA;
     });
     
@@ -321,8 +334,14 @@ function renderOrders(orders) {
 
 // Render Single Order Card
 function renderOrderCard(order) {
+    // Validate order data
+    if (!order || !order.trackerId) {
+        console.warn('Invalid order data:', order);
+        return '';
+    }
+    
     const status = ORDER_STATUSES[order.status] || ORDER_STATUSES['placed'];
-    const placedDate = new Date(order.placedAt || order.placed_at);
+    const placedDate = new Date(order.placedAt || order.placed_at || Date.now());
     const timeAgo = getTimeAgo(placedDate);
     
     return `
@@ -341,15 +360,15 @@ function renderOrderCard(order) {
                 <div class="order-info-grid">
                     <div class="order-info-item">
                         <span class="info-label">Payment</span>
-                        <span class="info-value">${order.paymentMethod.toUpperCase()}</span>
+                        <span class="info-value">${(order.paymentMethod || 'cash').toUpperCase()}</span>
                     </div>
                     <div class="order-info-item">
                         <span class="info-label">Fulfillment</span>
-                        <span class="info-value">${order.fulfilment === 'delivery' ? '🚗 Delivery' : '🏪 Pickup'}</span>
+                        <span class="info-value">${(order.fulfilment || 'pickup') === 'delivery' ? '🚗 Delivery' : '🏪 Pickup'}</span>
                     </div>
                     <div class="order-info-item">
                         <span class="info-label">Total</span>
-                        <span class="info-value" style="color:var(--secondary);font-weight:700;">R ${order.total.toFixed(2)}</span>
+                        <span class="info-value" style="color:var(--secondary);font-weight:700;">R ${(order.total || 0).toFixed(2)}</span>
                     </div>
                 </div>
                 
@@ -364,9 +383,12 @@ function renderOrderCard(order) {
                 <div class="order-items">
                     <strong>Items:</strong>
                     <ul>
-                        ${order.items.map(item => `
-                            <li>${item.name} x${item.quantity} - R ${(item.price * item.quantity).toFixed(2)}</li>
-                        `).join('')}
+                        ${(order.items || []).map(item => {
+                            const itemName = item.name || 'Unknown Item';
+                            const itemQty = item.quantity || 1;
+                            const itemPrice = item.price || 0;
+                            return `<li>${itemName} x${itemQty} - R ${(itemPrice * itemQty).toFixed(2)}</li>`;
+                        }).join('')}
                     </ul>
                 </div>
                 
