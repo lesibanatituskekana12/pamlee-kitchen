@@ -95,25 +95,31 @@
     </div>
   </footer>
 
+  <script src="api.js"></script>
   <script>
     const form = document.getElementById('signupForm');
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value.trim();
 
-      const users = JSON.parse(localStorage.getItem('pamlee_users') || '[]');
-      if (users.find(u => u.email === email)) {
-        alert('Account already exists. Please sign in.');
+      if (!email || !password) {
+        alert('Please fill in all fields.');
         return;
       }
 
-      users.push({ email, password });
-      localStorage.setItem('pamlee_users', JSON.stringify(users));
-      localStorage.setItem('pamlee_user', JSON.stringify({ email }));
+      if (password.length < 6) {
+        alert('Password must be at least 6 characters long.');
+        return;
+      }
 
-      alert('Account created successfully! Redirecting...');
-      window.location.href = 'index.html';
+      try {
+        const data = await AuthAPI.signup(email, password);
+        alert('Account created successfully! Redirecting...');
+        window.location.href = 'index.html';
+      } catch (error) {
+        alert(error.message || 'Signup failed. Please try again.');
+      }
     });
   </script>
 </body>

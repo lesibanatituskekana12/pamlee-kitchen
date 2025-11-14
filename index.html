@@ -115,49 +115,10 @@
       <h2 class="section-title fade-in">Popular Items</h2>
       <p class="section-subtitle fade-in">Our customers' favorites</p>
 
-      <div class="products-grid">
-        <div class="product-card fade-in">
-          <div class="product-image">
-            <img src="../src/assets/product-cake.jpg" alt="Chocolate Cake">
-            <span class="badge">Popular</span>
-          </div>
-          <div class="product-info">
-            <h3>Chocolate Cake</h3>
-            <p>Rich chocolate layers with creamy frosting</p>
-            <div class="product-footer">
-              <span class="price">R 250.00</span>
-              <button class="btn btn-gold btn-sm" onclick="addToCart('1','Chocolate Cake',250,'../src/assets/product-cake.jpg')">Add</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="product-card fade-in">
-          <div class="product-image">
-            <img src="../src/assets/product-cupcakes.jpg" alt="Cupcakes">
-            <span class="badge">Popular</span>
-          </div>
-          <div class="product-info">
-            <h3>Assorted Cupcakes</h3>
-            <p>6 piece variety pack with different flavors</p>
-            <div class="product-footer">
-              <span class="price">R 120.00</span>
-              <button class="btn btn-gold btn-sm" onclick="addToCart('2','Assorted Cupcakes',120,'../src/assets/product-cupcakes.jpg')">Add</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="product-card fade-in">
-          <div class="product-image">
-            <img src="../src/assets/product-pastries.jpg" alt="Pastries">
-          </div>
-          <div class="product-info">
-            <h3>French Pastries</h3>
-            <p>Buttery, flaky pastries fresh from the oven</p>
-            <div class="product-footer">
-              <span class="price">R 45.00</span>
-              <button class="btn btn-gold btn-sm" onclick="addToCart('3','French Pastries',45,'../src/assets/product-pastries.jpg')">Add</button>
-            </div>
-          </div>
+      <div class="products-grid" id="popularProductsGrid">
+        <!-- Products will be loaded dynamically from backend -->
+        <div class="product-card fade-in" style="grid-column: 1/-1; text-align: center; padding: 2rem;">
+          <p style="color: var(--muted-foreground);">Loading popular products...</p>
         </div>
       </div>
 
@@ -257,6 +218,94 @@
         <div style="border-top: 1px solid var(--border); margin-top: 0.5rem; padding-top: 0.5rem;">
           <a href="login.html" class="nav-link">🔐 Sign In</a>
         </div>`;
+    }
+
+    // Load popular products from backend
+    async function loadPopularProducts() {
+      const grid = document.getElementById('popularProductsGrid');
+      
+      try {
+        if (window.ProductsAPI) {
+          const data = await ProductsAPI.getAll();
+          const popularProducts = data.products.filter(p => p.isPopular).slice(0, 3);
+          
+          if (popularProducts.length > 0) {
+            grid.innerHTML = popularProducts.map(product => `
+              <div class="product-card fade-in">
+                <div class="product-image">
+                  <img src="${product.image}" alt="${product.name}">
+                  <span class="badge">Popular</span>
+                </div>
+                <div class="product-info">
+                  <h3>${product.name}</h3>
+                  <p>${product.description}</p>
+                  <div class="product-footer">
+                    <span class="price">R ${product.price.toFixed(2)}</span>
+                    <button class="btn btn-gold btn-sm" onclick="addToCart('${product.id}','${product.name}',${product.price},'${product.image}')">Add</button>
+                  </div>
+                </div>
+              </div>
+            `).join('');
+          } else {
+            // Fallback if no popular products
+            grid.innerHTML = '<div class="product-card fade-in" style="grid-column: 1/-1; text-align: center; padding: 2rem;"><p style="color: var(--muted-foreground);">No popular products available. <a href="menu.html" class="btn btn-gold" style="margin-top: 1rem;">View Full Menu</a></p></div>';
+          }
+        }
+      } catch (error) {
+        console.error('Error loading popular products:', error);
+        // Fallback to hardcoded products
+        grid.innerHTML = `
+          <div class="product-card fade-in">
+            <div class="product-image">
+              <img src="../src/assets/product-cake.jpg" alt="Chocolate Cake">
+              <span class="badge">Popular</span>
+            </div>
+            <div class="product-info">
+              <h3>Chocolate Cake</h3>
+              <p>Rich chocolate layers with creamy frosting</p>
+              <div class="product-footer">
+                <span class="price">R 250.00</span>
+                <button class="btn btn-gold btn-sm" onclick="addToCart('1','Chocolate Cake',250,'../src/assets/product-cake.jpg')">Add</button>
+              </div>
+            </div>
+          </div>
+          <div class="product-card fade-in">
+            <div class="product-image">
+              <img src="../src/assets/product-cupcakes.jpg" alt="Cupcakes">
+              <span class="badge">Popular</span>
+            </div>
+            <div class="product-info">
+              <h3>Assorted Cupcakes</h3>
+              <p>6 piece variety pack with different flavors</p>
+              <div class="product-footer">
+                <span class="price">R 120.00</span>
+                <button class="btn btn-gold btn-sm" onclick="addToCart('2','Assorted Cupcakes',120,'../src/assets/product-cupcakes.jpg')">Add</button>
+              </div>
+            </div>
+          </div>
+          <div class="product-card fade-in">
+            <div class="product-image">
+              <img src="../src/assets/product-pastries.jpg" alt="Pastries">
+            </div>
+            <div class="product-info">
+              <h3>French Pastries</h3>
+              <p>Buttery, flaky pastries fresh from the oven</p>
+              <div class="product-footer">
+                <span class="price">R 45.00</span>
+                <button class="btn btn-gold btn-sm" onclick="addToCart('3','French Pastries',45,'../src/assets/product-pastries.jpg')">Add</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // Load products when page loads
+    if (window.ProductsAPI) {
+      loadPopularProducts();
+    } else {
+      // Wait for api.js to load
+      window.addEventListener('load', loadPopularProducts);
     }
   </script>
 </body>
