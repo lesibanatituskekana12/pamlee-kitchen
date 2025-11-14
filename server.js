@@ -18,9 +18,21 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('.'));
 
-// Connect to MongoDB
+// Database connection middleware - ensures connection before each request
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    // Continue anyway - some endpoints might not need DB
+    next();
+  }
+});
+
+// Initial connection attempt
 connectDB().catch(err => {
-  console.error('Failed to connect to MongoDB:', err);
+  console.error('Initial MongoDB connection failed:', err);
 });
 
 // ============================
@@ -101,7 +113,7 @@ app.post('/api/auth/signup', async (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email }).maxTimeMS(10000);
     if (existingUser) {
       return res.status(400).json({ error: 'Email already registered' });
     }
@@ -126,6 +138,13 @@ app.post('/api/auth/signup', async (req, res) => {
       user: { id: user._id, email: user.email, name: user.name, role: user.role }
     });
   } catch (error) {
+    console.error('Signup error:', error);
+    if (error.name === 'MongooseError' || error.message.includes('buffering timed out')) {
+      return res.status(503).json({ 
+        error: 'Database connection issue. Please check if MongoDB is configured correctly.',
+        details: 'MONGO_URI environment variable may be missing or invalid'
+      });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -138,7 +157,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).maxTimeMS(10000);
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -160,6 +179,13 @@ app.post('/api/auth/login', async (req, res) => {
       user: { id: user._id, email: user.email, name: user.name, role: user.role }
     });
   } catch (error) {
+    console.error('Login error:', error);
+    if (error.name === 'MongooseError' || error.message.includes('buffering timed out')) {
+      return res.status(503).json({ 
+        error: 'Database connection issue. Please check if MongoDB is configured correctly.',
+        details: 'MONGO_URI environment variable may be missing or invalid'
+      });
+    }
     res.status(500).json({ error: error.message });
   }
 });
