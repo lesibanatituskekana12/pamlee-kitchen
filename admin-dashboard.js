@@ -115,12 +115,29 @@ async function initializeDashboard() {
     if (!window.RealtimeOrders) {
         console.error('RealtimeOrders not loaded!');
         showToast('❌ Error: Real-time system not available. Please refresh the page.');
+        
+        // Show loading state
+        document.getElementById('ordersContainer').innerHTML = `
+            <h2 style="margin-bottom:1rem;">Recent Orders</h2>
+            <div class="feature-card" style="padding:2rem;text-align:center;">
+                <p style="color:var(--muted-foreground);">❌ Real-time system not available. Please refresh the page.</p>
+            </div>
+        `;
         return;
     }
 
     try {
+        // Show loading state
+        document.getElementById('ordersContainer').innerHTML = `
+            <h2 style="margin-bottom:1rem;">Recent Orders</h2>
+            <div class="feature-card" style="padding:2rem;text-align:center;">
+                <p style="color:var(--muted-foreground);">⏳ Loading orders...</p>
+            </div>
+        `;
+        
         // Subscribe to order updates first
         window.RealtimeOrders.subscribe((orders) => {
+            console.log('Orders received:', orders.length);
             updateStats(orders);
             renderOrders(orders);
         });
@@ -137,10 +154,20 @@ async function initializeDashboard() {
         });
         
         // Start real-time polling (this will trigger the subscriptions)
+        console.log('Starting polling...');
         await window.RealtimeOrders.startPolling('admin');
+        console.log('Polling started');
     } catch (error) {
         console.error('Error initializing dashboard:', error);
         showToast('❌ Error loading orders. Please refresh the page.');
+        
+        document.getElementById('ordersContainer').innerHTML = `
+            <h2 style="margin-bottom:1rem;">Recent Orders</h2>
+            <div class="feature-card" style="padding:2rem;text-align:center;">
+                <p style="color:var(--muted-foreground);">❌ Error: ${error.message}</p>
+                <button class="btn btn-gold" onclick="location.reload()">Refresh Page</button>
+            </div>
+        `;
     }
 }
 
@@ -148,9 +175,14 @@ async function initializeDashboard() {
 function updateStats(orders) {
     const stats = window.RealtimeOrders.getStats();
     
-    document.getElementById('totalOrders').textContent = stats.total;
-    document.getElementById('totalRevenue').textContent = `R ${stats.revenue.toFixed(2)}`;
-    document.getElementById('pendingOrders').textContent = stats.pending + stats.preparing;
+    // Safely update stats with fallbacks
+    document.getElementById('totalOrders').textContent = stats.total || 0;
+    
+    // Fix NaN revenue issue
+    const revenue = isNaN(stats.revenue) ? 0 : stats.revenue;
+    document.getElementById('totalRevenue').textContent = `R ${revenue.toFixed(2)}`;
+    
+    document.getElementById('pendingOrders').textContent = (stats.pending || 0) + (stats.preparing || 0);
     
     // Get product count from API or default
     fetch('/api/products')

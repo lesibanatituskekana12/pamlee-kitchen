@@ -213,7 +213,9 @@
         this.orders.forEach(order => {
             stats[order.status] = (stats[order.status] || 0) + 1;
             if (order.status !== 'cancelled') {
-                stats.revenue += order.total;
+                // Ensure total is a number
+                const orderTotal = parseFloat(order.total) || 0;
+                stats.revenue += orderTotal;
             }
         });
 
