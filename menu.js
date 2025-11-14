@@ -5,11 +5,21 @@ let currentCategory = 'all';
 
 // Fetch products from backend
 async function loadProducts(category = 'all') {
+    const grid = document.getElementById('productsGrid');
+    
+    // Show loading state
+    if (grid) {
+        grid.innerHTML = '<div class="cart-empty" style="grid-column: 1/-1; padding: 3rem;">Loading products...</div>';
+    }
+    
     try {
         if (window.ProductsAPI) {
+            console.log('Loading products from API...');
             const data = await ProductsAPI.getAll(category);
-            products = data.products;
+            console.log('Products loaded:', data);
+            products = data.products || [];
         } else {
+            console.warn('ProductsAPI not available, using fallback products');
             // Fallback to hardcoded products
             products = [
                 { id: '1', name: 'Chocolate Cake', description: 'Rich chocolate layers with creamy frosting', category: 'cakes', price: 250, image: '../src/assets/product-cake.jpg', isPopular: true },
@@ -28,6 +38,20 @@ async function loadProducts(category = 'all') {
         renderProducts();
     } catch (error) {
         console.error('Failed to load products:', error);
+        // Use fallback products on error
+        products = [
+            { id: '1', name: 'Chocolate Cake', description: 'Rich chocolate layers with creamy frosting', category: 'cakes', price: 250, image: '../src/assets/product-cake.jpg', isPopular: true },
+            { id: '2', name: 'Assorted Cupcakes', description: '6 piece variety pack with different flavors', category: 'cupcakes', price: 120, image: '../src/assets/product-cupcakes.jpg', isPopular: true },
+            { id: '3', name: 'French Pastries', description: 'Buttery, flaky pastries fresh from the oven', category: 'pastries', price: 45, image: '../src/assets/product-pastries.jpg', isPopular: false },
+            { id: '4', name: 'Artisan Bread', description: 'Freshly baked sourdough with crispy crust', category: 'bread', price: 35, image: '../src/assets/product-bread.jpg', isPopular: false },
+            { id: '5', name: 'Vanilla Cake', description: 'Classic vanilla sponge with buttercream', category: 'cakes', price: 220, image: '../src/assets/product-cake.jpg', isPopular: false },
+            { id: '6', name: 'Blueberry Muffins', description: 'Moist muffins packed with fresh blueberries', category: 'muffins', price: 60, image: '../src/assets/product-cupcakes.jpg', isPopular: true },
+            { id: '7', name: 'Croissants', description: 'Light and buttery French croissants', category: 'pastries', price: 25, image: '../src/assets/product-pastries.jpg', isPopular: false },
+            { id: '8', name: 'Whole Wheat Bread', description: 'Healthy whole wheat loaf', category: 'bread', price: 30, image: '../src/assets/product-bread.jpg', isPopular: false }
+        ];
+        if (category !== 'all') {
+            products = products.filter(p => p.category === category);
+        }
         renderProducts();
     }
 }
@@ -94,5 +118,13 @@ function filterCategory(category, element) {
 
 // Initialize products on page load
 document.addEventListener('DOMContentLoaded', () => {
-    loadProducts();
+    // Wait a bit for api.js to load
+    if (window.ProductsAPI) {
+        loadProducts();
+    } else {
+        // Retry after a short delay
+        setTimeout(() => {
+            loadProducts();
+        }, 100);
+    }
 });

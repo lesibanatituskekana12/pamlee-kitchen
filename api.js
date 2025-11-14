@@ -163,4 +163,5 @@ if (typeof window !== 'undefined') {
   window.ProductsAPI = ProductsAPI;
   window.OrdersAPI = OrdersAPI;
   window.StatsAPI = StatsAPI;
+  console.log('✅ API client loaded successfully');
 }
